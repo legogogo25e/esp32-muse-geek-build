@@ -1,0 +1,295 @@
+# Build esp32-muse-geek firmware with GitHub Actions, and publish
+# it to GitHub Pages (manifest + .bin files, read by the web flasher
+# and by device.ota).
+#
+# Source: https://github.com/legogogo25e/esp32-muse-geek
+#   (ESP32-only source repo; its root IS the esp32/ tree, so the build
+#   runs in the checkout root, not in a esp32/ subdirectory.)
+# Toolchain: espressif/idf:v6.0.3 (upstream requires ESP-IDF v6.0.3 exactly)
+# Default board: waveshare-s3-geek = Waveshare ESP32-S3-GEEK (ESP32-S3R2,
+#   16 MB flash, 2 MB PSRAM, 1.14" ST7789 status screen).
+# No SDK token is baked into the firmware. Set it later over serial/BLE.
+#
+# Published site (after the Pages job runs once):
+# https://legogogo25e.github.io/esp32-muse-geek-build/
+# manifest.json -> latest built board (root manifest)
+# flasher.html -> ESP32 web flasher page (Web Serial, top-level https page)
+# firmware/<board>/manifest.json -> this board's manifest (addresses,
+# sizes, SHA-256, flash mode/freq/size)
+# firmware/<board>/muse-gadget.bin, bootloader.bin,
+# partition-table.bin, flasher_args.json, build-info.txt
+# The manifest's file addresses come from the build's own flasher_args.json
+# (muse-gadget uses a non-default partition-table offset 0x10000 and app
+# slot ota_0 at 0x20000 — never hard-code the IDF defaults 0x8000/0x10000).
+#
+# How to run (see README.md):
+# Actions > Build ESP32 firmware > Run workflow > pick upstream_ref / version
+# -- or push a change to this workflow file, which also triggers a run.
+#
+# DRAFT — adapted from legogogo25e/muse-gadget-build
+# .github/workflows/build-esp32.yml (read 2026-11-10). NOT yet uploaded:
+# workflow files can only be uploaded via the browser (GitHub App has no
+# workflows permission; API push returns 403). Validate YAML locally
+# before uploading, and verify the file exists with a read tool after.
+name: Build ESP32 firmware
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-esp32.yml"
+  workflow_dispatch:
+    inputs:
+      board:
+        description: "Board to build"
+        required: true
+        default: "waveshare-s3-geek"
+        type: choice
+        options:
+          - waveshare-s3-geek
+      upstream_ref:
+        description: "esp32-muse-geek ref to build (branch, tag or full commit SHA)"
+        required: true
+        default: "main"
+        type: string
+      project_version:
+        description: "Firmware version (PROJECT_VER, e.g. 1.0.0; OTA skips if not newer)"
+        required: true
+        default: "1.0.0"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.board || 'waveshare-s3-geek' }}
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.0.3
+    timeout-minutes: 60
+    env:
+      BOARD: ${{ inputs.board || 'waveshare-s3-geek' }}
+      UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
+      PROJECT_VER: ${{ inputs.project_version || '1.0.0' }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout esp32-muse-geek
+        uses: actions/checkout@v4
+        with:
+          repository: legogogo25e/esp32-muse-geek
+          ref: ${{ env.UPSTREAM_REF }}
+          path: upstream
+          persist-credentials: false
+          token: ${{ secrets.UPSTREAM_REPO_TOKEN }}
+
+      - name: Map board to target and sdkconfig defaults
+        id: board
+        run: |
+          case "$BOARD" in
+            waveshare-s3-geek)
+              TARGET=esp32s3
+              DEFAULTS="sdkconfig.defaults;devices/sdkconfig.waveshare-s3-geek"
+              ;;
+            *)
+              echo "::error::unknown board $BOARD"
+              exit 1
+              ;;
+          esac
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "defaults=$DEFAULTS" >> "$GITHUB_OUTPUT"
+          echo "board=$BOARD target=$TARGET defaults=$DEFAULTS"
+
+      - name: Build firmware
+        working-directory: upstream
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          idf.py --version
+          idf.py -B "build-$BOARD" \
+            -DIDF_TARGET="${{ steps.board.outputs.target }}" \
+            -DSDKCONFIG="build-$BOARD/sdkconfig" \
+            -DSDKCONFIG_DEFAULTS="${{ steps.board.outputs.defaults }}" \
+            -DPROJECT_VER="$PROJECT_VER" \
+            build
+
+      - name: Record build info
+        working-directory: upstream
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          {
+            echo "board=$BOARD"
+            echo "target=${{ steps.board.outputs.target }}"
+            echo "upstream_ref=$UPSTREAM_REF"
+            echo "upstream_sha=$(git -C . rev-parse HEAD)"
+            echo "project_version=$PROJECT_VER"
+            echo "idf_version=$(idf.py --version 2>/dev/null || echo unknown)"
+            echo "built_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "built_at_hkt=$(TZ=Asia/Hong_Kong date +%Y-%m-%dT%H:%M:%S+08:00)"
+            echo "github_run=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > build-info.txt
+          ls -lh "build-$BOARD/muse-gadget.bin" "build-$BOARD/bootloader/bootloader.bin" "build-$BOARD/partition_table/partition-table.bin" "build-$BOARD/flasher_args.json"
+          sha256sum "build-$BOARD/muse-gadget.bin" | tee -a build-info.txt
+          cat build-info.txt
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ env.BOARD }}-${{ env.PROJECT_VER }}
+          path: |
+            upstream/build-${{ env.BOARD }}/muse-gadget.bin
+            upstream/build-${{ env.BOARD }}/bootloader/bootloader.bin
+            upstream/build-${{ env.BOARD }}/partition_table/partition-table.bin
+            upstream/build-${{ env.BOARD }}/ota_data_initial.bin
+            upstream/build-${{ env.BOARD }}/phy_init_data.bin
+            upstream/build-${{ env.BOARD }}/flasher_args.json
+            upstream/build-info.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-pages:
+    name: Publish firmware to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      BOARD: ${{ inputs.board || 'waveshare-s3-geek' }}
+      PROJECT_VER: ${{ inputs.project_version || '1.0.0' }}
+    steps:
+      - name: Checkout this repo (for flasher page)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-${{ env.BOARD }}-${{ env.PROJECT_VER }}
+          path: firmware-artifact
+
+      - name: Generate Pages site (firmware + manifest)
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, shutil
+          art = pathlib.Path("firmware-artifact")
+          def find(name):
+              hits = sorted(art.rglob(name))
+              if not hits:
+                  raise SystemExit(f"missing in artifact: {name}")
+              return hits[0]
+          def sha256(p):
+              return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+          info = {}
+          for line in find("build-info.txt").read_text().splitlines():
+              if "=" in line and not line[0].isdigit():
+                  k, v = line.split("=", 1)
+                  info[k.strip()] = v.strip()
+          fa = json.loads(find("flasher_args.json").read_text())
+          flash_files = fa.get("flash_files") or {}
+          settings = fa.get("flash_settings") or {}
+          if not flash_files:
+              raise SystemExit("flasher_args.json has no flash_files mapping")
+          wanted = {"bootloader.bin": None, "partition-table.bin": None,
+                    "ota_data_initial.bin": None, "phy_init_data.bin": None,
+                    "muse-gadget.bin": None}
+          for addr, path in flash_files.items():
+              base = os.path.basename(str(path))
+              if base in wanted:
+                  wanted[base] = int(addr, 16)
+          if any(v is None for v in wanted.values()):
+              raise SystemExit(f"flasher_args.json missing a file: {wanted}")
+          flash = {
+              "mode": settings.get("flash_mode") or "qio",
+              "freq": settings.get("flash_freq") or "80m",
+              "size": settings.get("flash_size") or "8MB",
+          }
+          board = info["board"]
+          outdir = pathlib.Path("pages") / "firmware" / board
+          outdir.mkdir(parents=True, exist_ok=True)
+          files = []
+          src = {
+              "bootloader.bin": find("bootloader.bin"),
+              "partition-table.bin": find("partition-table.bin"),
+              "ota_data_initial.bin": find("ota_data_initial.bin"),
+              "phy_init_data.bin": find("phy_init_data.bin"),
+              "muse-gadget.bin": find("muse-gadget.bin"),
+          }
+          for name, addr in wanted.items():
+              p = src[name]
+              shutil.copyfile(p, outdir / name)
+              files.append({
+                  "name": name,
+                  "url": f"firmware/{board}/{name}",
+                  "address": addr,
+                  "size": p.stat().st_size,
+                  "sha256": sha256(p),
+              })
+          files.sort(key=lambda f: f["address"])
+          shutil.copyfile(find("flasher_args.json"), outdir / "flasher_args.json")
+          shutil.copyfile(find("build-info.txt"), outdir / "build-info.txt")
+          board_manifest = {
+              "board": board,
+              "target": info.get("target"),
+              "project_version": info.get("project_version"),
+              "upstream_ref": info.get("upstream_ref"),
+              "upstream_sha": info.get("upstream_sha"),
+              "idf_version": info.get("idf_version"),
+              "built_at_utc": info.get("built_at_utc"),
+              "built_at_hkt": info.get("built_at_hkt"),
+              "github_run": info.get("github_run"),
+              "flash": flash,
+              "files": files,
+          }
+          (outdir / "manifest.json").write_text(
+              json.dumps(board_manifest, indent=2) + "\n")
+          root_manifest = {
+              "repo": "legogogo25e/esp32-muse-geek-build",
+              "updated_at_utc": info.get("built_at_utc"),
+              "updated_at_hkt": info.get("built_at_hkt"),
+              "boards": {board: board_manifest},
+          }
+          pathlib.Path("pages/manifest.json").write_text(
+              json.dumps(root_manifest, indent=2) + "\n")
+          index = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+          <title>esp32-muse-geek firmware</title></head><body>
+          <h1>esp32-muse-geek firmware</h1>
+          <p>Latest build: board <b>{board}</b>, version
+          <b>{info.get("project_version")}</b>, built
+          {info.get("built_at_utc")} UTC.
+          <a href="manifest.json">manifest.json</a> |
+          <a href="firmware/{board}/manifest.json">board manifest</a></p>
+          <ul>
+          {"".join(f'<li><a href="firmware/{board}/{f["name"]}">{f["name"]}</a> — 0x{f["address"]:x}, {f["size"]} bytes</li>' for f in files)}
+          </ul>
+          <p>Flash it from the browser with the <a href="flasher.html">ESP32 web flasher</a>
+          (Web Serial, desktop Chrome/Edge), or download the files and use
+          <code>idf.py flash</code> / <code>esptool.py</code>.</p>
+          </body></html>
+          """
+          pathlib.Path("pages/index.html").write_text(index)
+          print(json.dumps(root_manifest, indent=2))
+          PY
+
+      - name: Include web flasher page
+        run: cp flasher.html pages/flasher.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
