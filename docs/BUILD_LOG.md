@@ -20,6 +20,8 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #13 | — | 2026-11-11 16:10 | — | — | **Build FAILED** — ADC line-fitting API not on S3 |
 | #14 | `5872e30` | 2026-11-11 16:18 | 1,642,496 | `79b2f167…` | Build ok; **OTA rolled back** — register JSON > 8192 cap |
 | #15 | `66f51c7` | 2026-11-11 16:32 | 1,642,496 | `7a98cdf8…` | External UART1/I2C/GPIO6; live on board |
+| #16 | `6e2fa950` | 2026-11-11 17:36 | 1,642,496 | `2899abb1…` | External-devices page; live on board |
+| #17 | `3ca7b4ff` | 2026-11-11 17:45 | 1,642,496 | `f95df086…` | External page `?` garble fix; live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -187,3 +189,59 @@ status, Muse Link text + image, OTA, reboot.
   a clean write of "LOOPBACK-OK-456" read back byte-for-byte as UTF-8, and
   a hex write of "deadbeef" read back as 4 bytes hex. Both encodings loop
   back correctly.
+
+## Run #16 — external-devices page (live on board)
+
+- Upstream `6e2fa950`, built 2026-11-11 17:36:00 HKT, app 1,642,496 B,
+  sha256 `2899abb1…`. Run 42996114634, success (3m20s). Manifest
+  verified: same 5 addresses, downloaded SHA matches, strings contain
+  "display.show_external" and "external-devices page".
+- What it adds (Geek only, `main/led_status.c` +
+  `main/geek_external.c`, `tests/test_geek_external_page.py`, 16 tests):
+  a status page for the external interfaces, shown by a double BOOT
+  press (the double-press was ignored before) or `display.show_external`;
+  a short BOOT press or `display.show_animation` goes back to the
+  animation. The status bar shows the firmware version (`v1.0.0`,
+  from `esp_app_get_description()`) instead of the clock while the page
+  is on; the main page keeps the clock. Contents, scale-1 pixel font
+  (6 px/char, 8 px tall): UART1 baud / TX-RX pins / TX-RX byte counts,
+  ADC GPIO6 + live voltage, I2C frequency / SDA-SCL pins / found
+  addresses / TX-RX byte counts. Byte counts are cumulative since boot
+  (`geek_external_stats()`; a register byte before an I2C read counts
+  as 1 TX byte); I2C addresses are the last scan's result, cached
+  (`geek_external_i2c_cached_addrs()`), with a scan on page entry.
+  The ADC and the counts refresh ~2 Hz from the animation task; the
+  backlight stays on while the page is showing. `s_status_clock` is
+  `char[40]` (was `[6]`) so the version fits.
+- OTA applied first try; board back in ~90 s, health ok. Boot log:
+  "sent link.register (9070 bytes)" (was 8629; the new command added
+  ~440 bytes, still well under the 16384 cap), "link.register acked",
+  "OTA image validated (control WS up)", no rollback.
+- End-to-end verified on board: the user double-pressed BOOT and the
+  page showed (log: "button double-press toggled external page
+  (showing=1)"), short-pressed to hide it, double-pressed again;
+  `display.show_external` works from Link; `gpio.adc` GPIO6 reads
+  31 mV (raw 35, floating pin).
+- **Bug found by the user on first sight:** the page showed a bunch of
+  `?` garble. Cause: the draw loop read past the end of short lines
+  ("ADC" is 3 chars) into uninitialised stack in the 40-byte text
+  buffer, and the garbage bytes rendered as `?`. Fixed in run #17.
+
+## Run #17 — external page `?` garble fix (live on board)
+
+- Upstream `3ca7b4ff`, built 2026-11-11 17:45:25 HKT, app 1,642,496 B,
+  sha256 `f95df086…`. Run 42997321192, success. Manifest verified:
+  same 5 addresses, downloaded SHA matches. Only `main/led_status.c`
+  and the test changed.
+- Fix: each page line now records its length (`strlen` after
+  `snprintf`), and the draw loop stops at it (`if (ci >= len) break;`)
+  instead of reading past the string into uninitialised stack.
+  Regression test
+  `tests/test_geek_external_page.py::test_draw_loop_never_reads_past_a_line`.
+- OTA applied first try; board back in ~90 s, health ok, "OTA image
+  validated", no rollback. Register still 9070 bytes.
+- End-to-end verified on board: the user double-pressed to the page;
+  `serial.write` "STATS-TEST-001" (14 B) + "STATS-TEST-002" (14 B) +
+  "HELLO-UART1" (11 B) = 39 B TX, and the loopback (GPIO13↔GPIO14
+  still shorted) read back all 39 B as UTF-8, so the page shows
+  TX 39 B / RX 39 B. The `?` garble is gone (user to confirm visually).
