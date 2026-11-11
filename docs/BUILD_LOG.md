@@ -181,3 +181,9 @@ status, Muse Link text + image, OTA, reboot.
   `device.display` Chinese text "外接接口就绪" drew.
 - Not yet verified: UART1 loopback (`serial.write` → `serial.read`)
   needs a jumper shorting GPIO13↔GPIO14 on the H2 header (user's hands).
+  **Verified 2026-11-11 ~16:40 after the user shorted them:** the RX ring
+  first returned ~2.7 KB of garbage that had accumulated while RX floated
+  before the short (a floating UART RX receives noise); after draining it,
+  a clean write of "LOOPBACK-OK-456" read back byte-for-byte as UTF-8, and
+  a hex write of "deadbeef" read back as 4 bytes hex. Both encodings loop
+  back correctly.
