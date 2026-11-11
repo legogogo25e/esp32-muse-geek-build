@@ -22,7 +22,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #15 | `66f51c7` | 2026-11-11 16:32 | 1,642,496 | `7a98cdf8…` | External UART1/I2C/GPIO6; live on board |
 | #16 | `6e2fa950` | 2026-11-11 17:36 | 1,642,496 | `2899abb1…` | External-devices page; live on board |
 | #17 | `3ca7b4ff` | 2026-11-11 17:45 | 1,642,496 | `f95df086…` | External page `?` garble fix; live on board |
-| #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); OTA pending |
+| #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -272,5 +272,12 @@ status, Muse Link text + image, OTA, reboot.
 - Host tests: affected modules 39/39 pass; full suite excl. avatar
   561 tests, 3 failures + 11 errors = the known environmental
   baseline (no regressions).
-- **Board verification pending**: waiting for the user's OTA go-ahead.
-  (README + AGENTS.md already updated to the v3 layout and pushed.)
+- OTA applied first try (`{"ok": true, "rebooting": true, "status":
+  "applied"}`); board back in ~90 s, health ok (uptime 91 s). Boot
+  log: "sent link.register (9070 bytes)", "link.register acked",
+  "OTA image validated (control WS up)", no rollback.
+- End-to-end verified on board: `display.show_external` opens the v3
+  page; `serial.write` "V3-BIG-FONT-OK" (14 B) looped back and read
+  as 14 B UTF-8, so the page shows TX 14B / RX 14B; `gpio.adc` GPIO6
+  reads 0 mV (raw 0, floating pin). (README + AGENTS.md already
+  updated to the v3 layout and pushed.)
