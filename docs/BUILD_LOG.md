@@ -22,6 +22,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #15 | `66f51c7` | 2026-11-11 16:32 | 1,642,496 | `7a98cdf8…` | External UART1/I2C/GPIO6; live on board |
 | #16 | `6e2fa950` | 2026-11-11 17:36 | 1,642,496 | `2899abb1…` | External-devices page; live on board |
 | #17 | `3ca7b4ff` | 2026-11-11 17:45 | 1,642,496 | `f95df086…` | External page `?` garble fix; live on board |
+| #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); OTA pending |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -245,3 +246,31 @@ status, Muse Link text + image, OTA, reboot.
   "HELLO-UART1" (11 B) = 39 B TX, and the loopback (GPIO13↔GPIO14
   still shorted) read back all 39 B as UTF-8, so the page shows
   TX 39 B / RX 39 B. The `?` garble is gone (user to confirm visually).
+
+## Run #18 — external page v3, scale-2 font (build done, OTA pending)
+
+- Upstream `93052707`, built 2026-11-11 18:14:41 HKT, app 1,642,496 B,
+  sha256 `c7a2c9c1…`. Run 43001478067, success. Manifest verified:
+  same 5 addresses, downloaded SHA matches. Firmware strings contain
+  the new v3 formats ("UART1 Tx(%d) Rx(%d)", "Baud %d 8N1",
+  "ADC (IO%d) %d.%03dV", "I2C SDA(%d) SCL(%d)", "Addr %s %dkHz").
+- What it changes (user-confirmed layout, `main/led_status.c`,
+  `tests/test_geek_external_page.py`, mockup
+  `prep/mockup_external_v3.py`): the page now uses the scale-2 pixel
+  font (12 px/char, 16 px tall) throughout — the scale-1 text was too
+  small. The GPIO pins sit on the section's own line in brackets
+  (`Tx(13)`, `Rx(14)`, `SDA(16)`, `SCL(17)`, `(IO6)`), and the UART
+  baud + 8N1 and the I2C address + frequency share a line with their
+  section, so the page is 7 rows: `UART1 Tx(13) Rx(14)` /
+  `Baud 115200 8N1` / `TX 39B RX 39B` / `ADC (IO6) 0.386V` /
+  `I2C SDA(16) SCL(17)` / `Addr 0x48 100kHz` / `TX 123B RX 456B`.
+  The user's two long lines (37 and 35 chars) were split in two because
+  a 240 px line at scale 2 only fits 20 chars. The I2C frequency is
+  100 kHz (shown as `100kHz`), not 100 Hz. The draw loop does the
+  scale-2 glyph lookup (`gx / scale`, `ly / scale`) and still stops at
+  each line's length (the run #17 `?` fix).
+- Host tests: affected modules 39/39 pass; full suite excl. avatar
+  561 tests, 3 failures + 11 errors = the known environmental
+  baseline (no regressions).
+- **Board verification pending**: waiting for the user's OTA go-ahead.
+  (README + AGENTS.md already updated to the v3 layout and pushed.)
