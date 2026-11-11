@@ -64,3 +64,49 @@ status, Muse Link text + image, OTA, reboot.
 - End-to-end verified: text "中文不用图片了" drew (1 line), the user
   saw it on screen and pressed BOOT; ack reads acknowledged, animation
   restored.
+
+## Run #10 — landscape GUI (build FAILED)
+
+- Upstream `5f976c38`, run 42968763326. Build failed in led_status.c:
+  `COLOR_GREEN` defined but not used (`-Werror=unused-const-variable`),
+  plus unused `to_full_scale`. Cause: the landscape GUI never paints a
+  coloured bar or dot, so nothing in the Geek build references them; the
+  other colours are still referenced by `blink`/`breathe` helpers. No
+  manifest was produced.
+
+## Run #11 — landscape GUI (live on board)
+
+- Upstream `33f033c1`, built 2026-11-11 14:06:33 HKT, app 1,576,960 B,
+  sha256 `3fb64521…`. Run 42969715934, success. Manifest verified: same 5
+  addresses, downloaded SHA matches, magic 0xE9, strings contain
+  "Connected" and "pool.ntp.org".
+- Fix: `COLOR_GREEN` and `to_full_scale` are now gated out for the Geek
+  (`#if !CONFIG_HOMEHUB_LED_BACKEND_WAVESHARE_S3_GEEK_ST7789`); still
+  defined for the other backends. Host test
+  `tests/test_geek_landscape_gui.py` asserts the guards so they do not
+  regress. `tests/test_link_spi_display_backends.py` updated: Geek
+  mirrors for rotation 1, gap (40, 53, 0x00), no title; its C probes
+  gained the std headers the pure helpers need. Full host suite: 532
+  tests, only the known environmental failures remain (missing IDF
+  managed components / FreeInk).
+- Screen is now 240x135 landscape (rotation 1, MADCTL 0x60, GRAM gap
+  (40, 53)), black background, white text/icons. Top status bar: WiFi
+  signal bars, HKT clock via SNTP, green dot + "Connected"/"Offline".
+  Mascot animation centred below it. A message covers the animation
+  until BOOT acknowledges it; the status bar stays visible. Backlight
+  turns off after 30 s idle (never while a message is showing); a BOOT
+  press while it is off only wakes it; a new message wakes it.
+  Full-width image chunks are at most 7 rows (1792 px / 240).
+- OTA applied first try (`{"ok": true, "rebooting": true, "status":
+  "applied"}`); board back in ~80 s, health ok, boot log shows
+  "LED status ready: Waveshare ESP32-S3-GEEK ST7789 240x135 display
+  (BL=7)" and "OTA image validated", no rollback. The boot log also
+  caught a real backlight wake in the wild: a BOOT press 36 s after boot
+  logged "button short-press woke the backlight; not acknowledging"
+  (the backlight had turned off after 30 s idle, the press woke it
+  only).
+- End-to-end verified on board: Chinese text "横屏 GUI 已上线" drew
+  (1 line, not truncated); user confirmed the screen is the right way
+  up, the status bar shows WiFi, the clock and Connected, and the
+  message is white on black in the main area; BOOT press → ack reads
+  acknowledged, showing false, animation restored.
