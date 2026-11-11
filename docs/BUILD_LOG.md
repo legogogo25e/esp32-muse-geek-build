@@ -23,6 +23,8 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #16 | `6e2fa950` | 2026-11-11 17:36 | 1,642,496 | `2899abb1…` | External-devices page; live on board |
 | #17 | `3ca7b4ff` | 2026-11-11 17:45 | 1,642,496 | `f95df086…` | External page `?` garble fix; live on board |
 | #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); live on board |
+| #19 | `382b82fc` | 2026-11-11 19:40 | — | — | **Build FAILED** — `-Werror=format-truncation` in led_status.c |
+| #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; OTA pending |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -281,3 +283,49 @@ status, Muse Link text + image, OTA, reboot.
   as 14 B UTF-8, so the page shows TX 14B / RX 14B; `gpio.adc` GPIO6
   reads 0 mV (raw 0, floating pin). (README + AGENTS.md already
   updated to the v3 layout and pushed.)
+
+## Run #19 — serial.config + i2c.config (build FAILED)
+
+- Upstream `382b82fc`, run 43013444372. Build failed in
+  `main/led_status.c`: `'snprintf' output may be truncated before the
+  last format character [-Werror=format-truncation=]` at the Baud line
+  (`"Baud %d %d%c%s"`). Cause: the stop-bits string is chosen at
+  runtime, so the compiler could not bound the `%s` and assumed the
+  output might exceed the 48-byte line buffer. No manifest was
+  produced. (Also a lesson: `gh run watch ... | tail` hides the watch's
+  exit code — the pipeline exits with tail's status, so a failed build
+  looked successful. Check the run conclusion directly.)
+
+## Run #20 — serial.config + i2c.config (build done, OTA pending)
+
+- Upstream `1c7a325b`, built 2026-11-11 19:53:59 HKT, app 1,642,496 B,
+  sha256 `f6ffded4…`. Run 43015314518, success. Manifest verified:
+  same 5 addresses, downloaded SHA matches. Firmware strings contain
+  "serial.config", "i2c.config" and the new error messages.
+- Fix for run #19: the stop-bits format is now `"%.3s"` ("1.5" is the
+  longest), so the compiler can prove the Baud line fits; and the
+  external-page line buffer grew 48 → 64 bytes because the Addr line
+  (`"Addr %s %dkHz"`) can reach ~52 bytes once the frequency comes
+  from `i2c.config` at runtime instead of the compile-time constant
+  (100000/1000 = 100, 3 chars). Regression test
+  `tests/test_geek_external_page.py` asserts the bounded format and
+  the 64-byte buffer.
+- What it adds (`main/geek_external.c`, `main/app.c`,
+  `main/noise_control.cpp`, `tests/test_geek_external.py`, 5 new
+  tests): `serial.config` (baud 300-3000000, data_bits 5-8, parity
+  none/even/odd, stop_bits 1/1.5/2; all optional, no params returns the
+  current config; changing it flushes the RX ring) and `i2c.config`
+  (frequency 10000-1000000 Hz, default device address 0-127 or -1 to
+  clear; all optional). `i2c.read` / `i2c.write` now take an optional
+  address and fall back to the default; with neither set they error
+  and point at `i2c.config`. The I2C clock is per device
+  (`scl_speed_hz`), so changing the frequency takes effect on the next
+  transaction without rebuilding the bus. The external page shows the
+  live serial format and the live I2C frequency. 22 commands total
+  (was 20).
+- Host tests: affected modules 44/44 pass; full suite excl. avatar
+  566 tests, 3 failures + 11 errors = the known environmental
+  baseline (no regressions).
+- **Board verification pending**: waiting for the user's OTA go-ahead.
+  (README + AGENTS.md already updated to the config commands and
+  pushed.)
