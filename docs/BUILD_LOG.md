@@ -33,3 +33,15 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 
 Acceptance (all passed): build, USB flash + boot, pairing, screen
 status, Muse Link text + image, OTA, reboot.
+
+## Run #8 — BOOT-button message acknowledgement
+
+- Upstream `eb519fc0`, built 2026-11-11 11:41 HKT, app 1,445,888 B,
+  sha256 `4dbec24a…`. Adds `device.message_ack` (showing / seq /
+  acknowledged) and a BOOT short-press hook: tapping BOOT while a message
+  is on the screen acknowledges it and restores the animation. Pairing
+  confirmation and the 5 s hold to reset setup are unchanged. OTA applied
+  and validated on homelink-6dec20; end-to-end verified: test message
+  "Tap BOOT to confirm" (seq 1, showing, unacknowledged) → BOOT tap →
+  acknowledged, animation restored (log: "button short-press
+  acknowledged the on-screen message").
