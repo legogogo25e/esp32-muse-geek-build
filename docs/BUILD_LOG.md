@@ -15,6 +15,11 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #5 | `990acbd9` | 2026-11-11 10:52 | 1,445,888 | `4a97d9a6…` | BLE `MuseGadget-Geek`; typing mascot v1 (keyed bg); full-screen white |
 | #6 | `6d93279` | 2026-11-11 11:14 | 1,445,888 | `8fd57049…` | No agent-name title (non-ASCII name rendered as `?`) |
 | #7 | `f1a87d5` | 2026-11-11 11:24 | 1,445,888 | `3e3340e9…` | Typing mascot v2 (original black bg, paws press keys) |
+| #11 | `33f033c1` | 2026-11-11 14:06 | 1,576,960 | `3fb64521…` | Landscape GUI; live on board |
+| #12 | `26305b4d` | 2026-11-11 15:00 | 1,576,960 | `03a494bc…` | Timed full run (6m47s end to end); no code change |
+| #13 | — | 2026-11-11 16:10 | — | — | **Build FAILED** — ADC line-fitting API not on S3 |
+| #14 | `5872e30` | 2026-11-11 16:18 | 1,642,496 | `79b2f167…` | Build ok; **OTA rolled back** — register JSON > 8192 cap |
+| #15 | `66f51c7` | 2026-11-11 16:32 | 1,642,496 | `7a98cdf8…` | External UART1/I2C/GPIO6; live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -110,3 +115,69 @@ status, Muse Link text + image, OTA, reboot.
   up, the status bar shows WiFi, the clock and Connected, and the
   message is white on black in the main area; BOOT press → ack reads
   acknowledged, showing false, animation restored.
+
+## Run #12 — timed full run (no code change)
+
+- Upstream `26305b4d`, built 2026-11-11 ~15:00 HKT, app 1,576,960 B,
+  sha256 `03a494bc…`. Run 42975992392, success. Same size as run #11
+  (same code, SHA differs only by build timestamp). Full pipeline
+  timed 6 min 47 s: trigger 3 s, build + publish 4 min 01 s, manifest
+  verify 31 s, OTA + verify 2 min 15 s. OTA (`force`, same version
+  1.0.0) first try, board back, health ok, log shows "OTA image
+  validated". `gh workflow run` dispatch verified end to end.
+
+## Run #13 — ADC calibration (build FAILED)
+
+- Run 42984954822. Build failed in `main/geek_external.c`:
+  `adc_cali_line_fitting_config_t` unknown type, and
+  `adc_cali_create_scheme_line_fitting` implicitly declared. Cause:
+  line-fitting calibration is ESP32/S2/C2 only; the ESP32-S3 uses the
+  curve-fitting scheme. No manifest was produced.
+
+## Run #14 — external interfaces (OTA rolled back)
+
+- Upstream `5872e30`, built 2026-11-11 16:18:44 HKT, app 1,642,496 B,
+  sha256 `79b2f167…`. Run 42985559676, build success, manifest verified.
+  Fix for run #13: `adc_cali_curve_fitting_config_t` +
+  `adc_cali_create_scheme_curve_fitting` (chan = ADC_CHANNEL_5).
+- OTA applied (`{"ok": true, "rebooting": true, "status": "applied"}`),
+  but the board never came back online and rolled back to run #12
+  after 300 s. Root cause: the 8 new commands grew `link.register` to
+  ~8.6 KB, past the 8192-byte preallocated print buffer in
+  `build_register_json()` (`main/noise_control.cpp`), so it returned
+  NULL, the board reconnected in a loop and never validated the OTA.
+  No crash, no useful log line — just "could not build link.register".
+
+## Run #15 — external UART1 / I2C / GPIO6 (live on board)
+
+- Upstream `66f51c7`, built 2026-11-11 16:32:45 HKT, app 1,642,496 B,
+  sha256 `7a98cdf8…`. Run 42987442145, success. Manifest verified: same
+  5 addresses, downloaded SHA matches.
+- Fix for run #14: the register print cap raised 8192 → 16384, with a
+  comment explaining why. Regression test
+  `tests/test_geek_external.py::test_register_json_fits_its_print_buffer`
+  estimates the register size (run #12 measured 5626 bytes + the Geek
+  block) and fails if it exceeds the cap. AGENTS.md "Adding a Link
+  command" documents the cap as bound #6.
+- What it adds (all Geek-gated, `main/geek_external.c`):
+  `console.read`/`console.write` (renamed from `serial.read`/`serial.write`;
+  UART0 stays the console), `serial.read`/`serial.write` (device UART1,
+  TX GPIO13 / RX GPIO14, 8N1, default 115200, 2 KB RX ring),
+  `i2c.scan`/`i2c.read`/`i2c.write` (SDA GPIO16 / SCL GPIO17, 100 kHz,
+  internal pull-ups, hex data), `gpio.read`/`gpio.write`/`gpio.adc`
+  (only GPIO6; ADC1 CH5, 0–3.3 V, curve-fitting calibrated). 19
+  commands total (was 11).
+- OTA applied first try; board back in ~90 s, health ok. Boot log:
+  "sent link.register (8629 bytes)", "link.register acked", "OTA image
+  validated (control WS up)", no rollback. 8629 > 8192 confirms the
+  run #14 diagnosis.
+- End-to-end verified on board: `console.read` returns the log (rename
+  works); `i2c.scan` returns `[]` (nothing connected); `gpio.adc`
+  GPIO6 reads 386 mV (raw 436, calibrated); `gpio.write` 1 then
+  `gpio.read` reads back 1, then write 0; `gpio.read` pin 13 rejected
+  ("only GPIO6 is available"); `serial.write` "hello uart1" wrote 11
+  bytes; `serial.read` returns empty (nothing connected); `i2c.read`
+  on address 0x50 fails cleanly (`ESP_ERR_INVALID_RESPONSE`, no crash);
+  `device.display` Chinese text "外接接口就绪" drew.
+- Not yet verified: UART1 loopback (`serial.write` → `serial.read`)
+  needs a jumper shorting GPIO13↔GPIO14 on the H2 header (user's hands).
