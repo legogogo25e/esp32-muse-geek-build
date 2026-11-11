@@ -24,7 +24,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #17 | `3ca7b4ff` | 2026-11-11 17:45 | 1,642,496 | `f95df086…` | External page `?` garble fix; live on board |
 | #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); live on board |
 | #19 | `382b82fc` | 2026-11-11 19:40 | — | — | **Build FAILED** — `-Werror=format-truncation` in led_status.c |
-| #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; OTA pending |
+| #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -326,6 +326,20 @@ status, Muse Link text + image, OTA, reboot.
 - Host tests: affected modules 44/44 pass; full suite excl. avatar
   566 tests, 3 failures + 11 errors = the known environmental
   baseline (no regressions).
-- **Board verification pending**: waiting for the user's OTA go-ahead.
-  (README + AGENTS.md already updated to the config commands and
+- **OTA verified 2026-11-11 ~21:43 HKT** (run #20, force: true): applied
+  first try, board back in ~100 s, health ok (uptime 104 s). Boot log:
+  "sent link.register (10350 bytes)", "link.register acked",
+  "OTA image validated (control WS up)", no rollback. Register grew
+  9070 → 10350, well under the 16384 cap. 22 commands live.
+- Board checks: `serial.config` query returns 115200/8/none/1; set to
+  9600/7/even/2, read back the same, restored to 115200/8/none/1.
+  `i2c.config` query returns frequency 100000, address null; set to
+  400000 + default address 72, read back the same; `i2c.read` without
+  an address then used the default and failed cleanly
+  (`ESP_ERR_INVALID_RESPONSE`, nothing at 0x48); cleared the default
+  with -1 and restored 100000 Hz; `i2c.read` without an address then
+  errors cleanly ("no address given and no default address configured
+  (use i2c.config to set one)"). `display.show_external` opens the
+  page (baud line and frequency now live from the config).
+- (README + AGENTS.md already updated to the config commands and
   pushed.)
