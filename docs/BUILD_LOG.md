@@ -475,3 +475,45 @@ status, Muse Link text + image, OTA, reboot.
   `device.display` with no preceding `show_animation` — the message
   (seq 1 on the new firmware) stayed up past several 500 ms refresh
   cycles instead of being overwritten.
+
+## Run #25 — chat-post experiment round 1 (build + OTA verified, post rejected)
+
+- Upstream `esp32-muse-geek` @ `709a0c21` (app commit `10a549e7`):
+  experiment in `main/app.c` — a task reads complete lines from UART1
+  and posts each to `/chat/stream` on the device's own session via
+  `noise_ctrl_req_*`, body copied from the Linux SDK's `send_chat`
+  (`message` / `output_modality` / `device_id` / `session_id` =
+  `geek-serial-experiment`). App 1,642,496 B, sha256 `47dfb3da…`.
+  GitHub run 43161796719, success; manifest verified; OTA applied,
+  "OTA image validated", no rollback.
+- On board: the task captured the test line (`chat post test 3321`).
+  The first send was lost to a gateway outage (server reset the
+  session, two WS upgrades answered 502) because the round-1 code
+  dropped lines while disconnected. The second send reached the VM
+  and was answered **HTTP 400** (empty body) — the path and the
+  device are accepted, the body shape is not.
+- Host tests: `tests/test_geek_chat_post.py` (new) plus neighbours,
+  49/49.
+
+## Run #26 — chat-post experiment round 2 (build + OTA verified, post accepted)
+
+- Upstream `esp32-muse-geek` @ `1a143169` (app commit `69fffdac`):
+  the post body is now exactly the ESP32 Muse chat client's
+  text turn (`message` / `output_modality` only — no `device_id`,
+  no `session_id`), and the task queues the newest line while the
+  session is down and posts it on reconnect (a sent post clears the
+  queue whatever status the VM answers). App 1,642,496 B, sha256
+  `12caee3e…`. GitHub run 43164381493, success; manifest verified;
+  OTA applied, "OTA image validated", no rollback.
+- End-to-end proof with TX shorted to RX (loopback): the agent sent
+  `loopback chat post test 777\n` via `serial.write`; board log —
+  `queued line` at 90.592 s, `posted line (66 bytes)` at 90.593 s,
+  **`post reply: HTTP 200`** at 91.127 s — and the line appeared in
+  the user's **main chat** as a user turn ~0.6 s later, waking the
+  agent there. Verdict: **a Link-only device can wake the agent by
+  posting to the chat; no polling needed.** Which of round 1's two
+  extra fields caused the 400 was not bisected further.
+- Consequence while this firmware runs: every complete UART1 line
+  is posted to the main chat, and the task consumes the RX stream
+  (the agent's pull-based `serial.read` sees nothing). Experiment
+  behaviour, kept deliberately until the production design lands.
