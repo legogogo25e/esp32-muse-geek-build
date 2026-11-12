@@ -25,6 +25,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); live on board |
 | #19 | `382b82fc` | 2026-11-11 19:40 | — | — | **Build FAILED** — `-Werror=format-truncation` in led_status.c |
 | #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; live on board |
+| #21 | `0884e618` | 2026-11-12 09:58 | 1,642,496 | `9c0d655d…` | UART rings 100 KB (PSRAM); OTA pending |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -343,3 +344,28 @@ status, Muse Link text + image, OTA, reboot.
   page (baud line and frequency now live from the config).
 - (README + AGENTS.md already updated to the config commands and
   pushed.)
+
+## Run #21 — serial RX/TX rings 100 KB (build done, OTA pending)
+
+- Upstream `0884e618`, built 2026-11-12 09:58:53 HKT, app 1,642,496 B,
+  sha256 `9c0d655d…`. Run 43137768923, success. Manifest verified:
+  same 5 addresses, downloaded SHA matches.
+- What it changes (`main/geek_external.h`, `main/geek_external.c`,
+  `tests/test_geek_external.py`, 3 new tests): the UART1 RX ring grows
+  2048 → 100 KB and the TX ring 512 → 100 KB. Internal SRAM cannot
+  hold them (~120 KB free at runtime), so they rely on
+  `CONFIG_SPIRAM_USE_MALLOC=y` + `ALWAYSINTERNAL=16384` in
+  `sdkconfig.defaults`: the driver allocates the rings through the
+  generic heap (`xRingbufferCreate`), so allocations this large land
+  in PSRAM. If the install fails, init retries with 2048/512 so the
+  port comes up degraded instead of dead, and the boot log line
+  "device serial ready … RX buf %u B, TX buf %u B" reports the sizes
+  that actually installed.
+- Host tests: affected modules pass; full suite excl. avatar 569
+  tests, 3 failures + 11 errors = the known environmental baseline.
+- **Board verification pending**: waiting for the user's OTA go-ahead.
+  Proof on board = `device.health` heap numbers (PSRAM free drops
+  ~200 KB vs run #20's 1,487,324 B, internal free stays ~122 KB) plus
+  the boot log's buffer sizes, then a loopback/peer round-trip at
+  9600 baud (the config the user left the port in on 2026-11-12).
+- (README + AGENTS.md already updated to the 100 KB rings and pushed.)
