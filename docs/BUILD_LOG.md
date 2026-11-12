@@ -26,6 +26,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #19 | `382b82fc` | 2026-11-11 19:40 | — | — | **Build FAILED** — `-Werror=format-truncation` in led_status.c |
 | #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; live on board |
 | #21 | `0884e618` | 2026-11-12 09:58 | 1,642,496 | `9c0d655d…` | UART rings 100 KB (PSRAM); live on board |
+| #22 | `b1c558c2` | 2026-11-12 10:34 | 1,642,496 | `cb5536d7…` | External page section colours; OTA pending |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -385,3 +386,22 @@ status, Muse Link text + image, OTA, reboot.
   unchanged (~122 KB). Round-trip at 9600 8N1 (the peer setup):
   `serial.write` "hello agent" (11 B) read back byte-for-byte.
 - (README + AGENTS.md already updated to the 100 KB rings and pushed.)
+
+## Run #22 — external page section colours (build done, OTA pending)
+
+- Upstream `b1c558c2`, built 2026-11-12 10:34:34 HKT, app 1,642,496 B,
+  sha256 `cb5536d7…`. Run 43141956081, success. Manifest verified:
+  same 5 addresses, downloaded SHA matches.
+- What it changes (`main/led_status.c`,
+  `tests/test_geek_external_page.py`, 1 new test): the external page's
+  sections get distinct font colours — UART cyan, ADC yellow, I2C
+  magenta (user-approved from mockup `prep/mockup_external_v4.py`);
+  the status bar stays white. `lcd_ext_line_t` gains a `color` field
+  set per line in the builder, and the draw loop paints each glyph
+  pixel with its line's colour instead of one shared white.
+- Host tests: affected modules pass (incl. the unused-symbol check);
+  full suite excl. avatar 570 tests, 3 failures + 11 errors = the
+  known environmental baseline.
+- **Board verification pending**: waiting for the user's OTA go-ahead;
+  the colour rendering itself is only checkable by eye on the LCD.
+- (README + AGENTS.md already updated to the colours and pushed.)
