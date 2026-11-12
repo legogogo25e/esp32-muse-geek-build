@@ -441,3 +441,37 @@ status, Muse Link text + image, OTA, reboot.
   to `"none"` afterwards. The serial config was re-applied after the
   reboot (9600 8N1, the peer setup).
 - (README + AGENTS.md already updated to gpio.pull and pushed.)
+
+## Run #24 — message draws leave the external page (build + OTA verified)
+
+- Upstream `a46988a7`, built 2026-11-12 11:44:39 HKT, app 1,642,496 B,
+  sha256 `e526965b…`. GitHub run 43149828006 (#25), success. Manifest
+  verified: same 5 addresses, upstream matches the pushed head,
+  downloaded SHA matches.
+- The bug (found live 2026-11-12): with the external-devices page on,
+  `device.display` drew the message but left `s_external_mode` set, so
+  the page's 500 ms refresh (`lcd_external_refresh`) redrew the page
+  over the message within a frame — while `device.message_ack` still
+  reported `showing=true`, so the message looked delivered when it was
+  never visible. The workaround (show_animation first, then display)
+  proved the diagnosis before the fix.
+- The fix (`main/led_status.c`): both message draw paths —
+  `led_status_draw_text` and `lcd_draw_image_rect` (the latter also
+  covers chunked and fetched images) — clear `s_external_mode` under
+  the LCD lock when they draw, Geek-gated. The status bar then picks
+  the clock back up by itself (its centre text changes). Regression
+  test `test_message_draws_leave_the_external_page` in
+  `tests/test_geek_external_page.py`; repo AGENTS.md external-page
+  section updated to state the symmetry (page replaces message,
+  message replaces page).
+- Tests: affected modules 69/69 (incl. the unused-symbol check);
+  full suite minus `test_avatar_install`: 3 failures + 11 errors, the
+  known environmental baseline (IDF managed components / FreeInk),
+  no new regressions.
+- OTA applied first try; board back with "OTA image validated", no
+  rollback, health ok. Serial config re-applied after the reboot
+  (9600 8N1, the peer setup). On-board reproduction of the original
+  failure: external page opened (double BOOT), then a bare
+  `device.display` with no preceding `show_animation` — the message
+  (seq 1 on the new firmware) stayed up past several 500 ms refresh
+  cycles instead of being overwritten.
