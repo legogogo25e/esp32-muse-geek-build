@@ -539,3 +539,25 @@ status, Muse Link text + image, OTA, reboot.
   known end to end: local event → post {message, output_modality,
   session_id: <fixed UUID>} → dedicated side chat wakes its agent,
   main chat untouched.
+
+## Run #28 — chat-post round 4 (build + OTA verified, new side chat live)
+
+- Upstream `esp32-muse-geek` @ `39826187` (app commit `ad696e5a`):
+  fresh session UUID `6dec2001-1234-4abc-8def-0123456789ab` (round
+  3's was burned when its chat was deleted — posts to a deleted
+  session get HTTP 404, the VM never recreates it), control bytes
+  (< 0x20, 0x7F) are filtered out of the line assembly (a stray NUL
+  once truncated a user sentence to an empty post, HTTP 400), CR
+  terminates a line as well as LF, and the queued log now carries
+  the byte count. App 1,642,496 B, sha256 `4f5b8359…`. GitHub run
+  43169121212, success; manifest verified; OTA applied, "OTA image
+  validated", no rollback.
+- Verified end to end by the user: a serial question ("what is
+  HK.700 stock realtime price? answer me at geek lcd") created the
+  new side chat under the round-4 UUID, its agent answered and put
+  the price on the Geek LCD itself — the full device → agent →
+  screen loop with no polling and no main-chat involvement.
+- Operational rule: do not delete that side chat. If it is ever
+  deleted, the UUID must be rotated again (new build + OTA); a
+  404-fallback (re-post to the main chat) is the known alternative
+  and is not implemented.
