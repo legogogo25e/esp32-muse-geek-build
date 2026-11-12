@@ -25,7 +25,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #18 | `93052707` | 2026-11-11 18:14 | 1,642,496 | `c7a2c9c1…` | External page v3 (scale-2, user layout); live on board |
 | #19 | `382b82fc` | 2026-11-11 19:40 | — | — | **Build FAILED** — `-Werror=format-truncation` in led_status.c |
 | #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; live on board |
-| #21 | `0884e618` | 2026-11-12 09:58 | 1,642,496 | `9c0d655d…` | UART rings 100 KB (PSRAM); OTA pending |
+| #21 | `0884e618` | 2026-11-12 09:58 | 1,642,496 | `9c0d655d…` | UART rings 100 KB (PSRAM); live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -363,9 +363,25 @@ status, Muse Link text + image, OTA, reboot.
   that actually installed.
 - Host tests: affected modules pass; full suite excl. avatar 569
   tests, 3 failures + 11 errors = the known environmental baseline.
-- **Board verification pending**: waiting for the user's OTA go-ahead.
-  Proof on board = `device.health` heap numbers (PSRAM free drops
-  ~200 KB vs run #20's 1,487,324 B, internal free stays ~122 KB) plus
-  the boot log's buffer sizes, then a loopback/peer round-trip at
-  9600 baud (the config the user left the port in on 2026-11-12).
+- **OTA verified 2026-11-12 ~10:15 HKT** — but the first attempt
+  (10:01) stalled: the `device.ota` invoke timed out at 30 s and every
+  later invoke timed out for ~11 min while the board still showed
+  online (heartbeats are a separate task). The board's WAN was having
+  a bad patch — the recovery boot's log shows its VM-lease fetch
+  needing 3 attempts over ~47 s (`ESP_ERR_HTTP_EAGAIN`,
+  `ESP_ERR_HTTP_CONNECT`) — so the 1.6 MB download apparently crawled
+  with the command handler occupied. A `device.reboot` invoke did get
+  through and rebooted the board back into run #20 (its boot log had
+  the old serial line and the old heap numbers), and the second OTA
+  attempt went through in ~2.5 min on the recovered network. Lesson:
+  an OTA invoke timeout plus unresponsive commands does not mean the
+  board is dead — check `device.list` (still online) and be patient;
+  reboot unwedges it.
+- Proof on board: boot log "device serial ready: UART1 TX GPIO13 RX
+  GPIO14 @ 115200 baud, **RX buf 102400 B, TX buf 102400 B**" (no
+  fallback warning), "OTA image validated (control WS up)", no
+  rollback. `device.health`: PSRAM free 1,487,324 → **1,285,092 B**
+  (−202,232 ≈ the two 100 KB rings plus overhead), internal free
+  unchanged (~122 KB). Round-trip at 9600 8N1 (the peer setup):
+  `serial.write` "hello agent" (11 B) read back byte-for-byte.
 - (README + AGENTS.md already updated to the 100 KB rings and pushed.)
