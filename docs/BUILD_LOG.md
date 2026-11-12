@@ -27,6 +27,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; live on board |
 | #21 | `0884e618` | 2026-11-12 09:58 | 1,642,496 | `9c0d655d…` | UART rings 100 KB (PSRAM); live on board |
 | #22 | `b1c558c2` | 2026-11-12 10:34 | 1,642,496 | `cb5536d7…` | External page section colours; live on board |
+| #23 | `ca54ea12` | 2026-11-12 11:12 | 1,642,496 | `93a0705b…` | gpio.pull (GPIO6 internal pull); live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -412,3 +413,31 @@ status, Muse Link text + image, OTA, reboot.
   from this run on, the user says OTA needs no per-run go-ahead —
   build, OTA and verify directly.
 - (README + AGENTS.md already updated to the colours and pushed.)
+
+## Run #23 — gpio.pull (build + OTA verified)
+
+- Upstream `ca54ea12`, built 2026-11-12 11:12:39 HKT, app 1,642,496 B,
+  sha256 `93a0705b…`. Run 43146282218, success. Manifest verified:
+  same 5 addresses, downloaded SHA matches; firmware strings contain
+  "gpio.pull". 23 commands total (was 22).
+- What it adds (`main/geek_external.h/.c`, `main/app.c`,
+  `main/noise_control.cpp`, `tests/test_geek_external.py`, 3 new
+  tests): `gpio.pull` gets/sets the internal pull of GPIO6
+  (`"up"` / `"down"` / `"none"`, `pin` optional defaulting to 6; omit
+  `pull` to query). The setting persists in `s_gpio_pull` and is
+  applied by a shared `gpio6_config_input()` whenever the pin is
+  configured as an input — `gpio.read` included; setting it also
+  switches the pin to input mode. Default `"none"` (floating), as
+  before. Naming: the user suggested `gpio.setting`, then
+  `gpio.pull`, and took `gpio.pull` on the assistant's recommendation
+  (name says exactly what it controls; `.config` stays reserved for
+  multi-field configuration).
+- OTA applied first try (the user has lifted the per-run OTA
+  go-ahead: build → OTA → verify directly); board back in ~95 s,
+  health ok, no rollback. Board checks on the floating pin:
+  query → `"none"`; set `"down"` → `gpio.read` level 0, `gpio.adc`
+  0 mV / raw 0 (held at ground, no more floating wander); set `"up"`
+  → level 1, ADC raw 4095 (3159 mV calibrated at the rail); restored
+  to `"none"` afterwards. The serial config was re-applied after the
+  reboot (9600 8N1, the peer setup).
+- (README + AGENTS.md already updated to gpio.pull and pushed.)
