@@ -517,3 +517,25 @@ status, Muse Link text + image, OTA, reboot.
   is posted to the main chat, and the task consumes the RX stream
   (the agent's pull-based `serial.read` sees nothing). Experiment
   behaviour, kept deliberately until the production design lands.
+
+## Run #27 — chat-post experiment round 3 (build + OTA verified, side-chat routing works)
+
+- Upstream `esp32-muse-geek` @ `0fa0d65f` (app commit `57765a1e`):
+  the post body adds back `session_id` alone, in UUID form
+  (`6dec2000-1234-4abc-8def-0123456789ab`); `device_id` stays out.
+  App 1,642,496 B, sha256 `a1295157…`. GitHub run 43166502403,
+  success; manifest verified; OTA applied (the invoke timed out at
+  30 s but the board downloaded, rebooted and validated — judged by
+  uptime + log, per the runbook), "OTA image validated".
+- Loopback self-test: `sidechat uuid test 888\n` via `serial.write`;
+  board log — queued 94.759 s, posted (113 bytes) 94.760 s,
+  **post reply: HTTP 200** at 96.268 s. A new side chat appeared
+  whose chat_id is exactly the UUID, auto-titled "Test Sidechat
+  uuid", holding the line as a user turn and an agent reply.
+- Verdict: **side-chat routing works with a UUID session_id.** The
+  round-1 HTTP 400 is explained by its non-UUID session string
+  (`geek-serial-experiment`); `device_id`'s individual effect was
+  never isolated and remains untested. Production shape is now
+  known end to end: local event → post {message, output_modality,
+  session_id: <fixed UUID>} → dedicated side chat wakes its agent,
+  main chat untouched.
