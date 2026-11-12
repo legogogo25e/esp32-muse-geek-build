@@ -26,7 +26,7 @@ v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 | #19 | `382b82fc` | 2026-11-11 19:40 | — | — | **Build FAILED** — `-Werror=format-truncation` in led_status.c |
 | #20 | `1c7a325b` | 2026-11-11 19:53 | 1,642,496 | `f6ffded4…` | serial.config + i2c.config; live on board |
 | #21 | `0884e618` | 2026-11-12 09:58 | 1,642,496 | `9c0d655d…` | UART rings 100 KB (PSRAM); live on board |
-| #22 | `b1c558c2` | 2026-11-12 10:34 | 1,642,496 | `cb5536d7…` | External page section colours; OTA pending |
+| #22 | `b1c558c2` | 2026-11-12 10:34 | 1,642,496 | `cb5536d7…` | External page section colours; live on board |
 
 ## Verification (board homelink-6dec20, BLE `MuseGadget-Geek-6DEC20`)
 
@@ -402,6 +402,13 @@ status, Muse Link text + image, OTA, reboot.
 - Host tests: affected modules pass (incl. the unused-symbol check);
   full suite excl. avatar 570 tests, 3 failures + 11 errors = the
   known environmental baseline.
-- **Board verification pending**: waiting for the user's OTA go-ahead;
-  the colour rendering itself is only checkable by eye on the LCD.
+- **OTA verified 2026-11-12 ~10:56 HKT**: applied first try, board
+  back in ~90 s, health ok (uptime 106 s, PSRAM free unchanged at
+  1,285,092 B — the 100 KB rings still in PSRAM). Boot log: "OTA image
+  validated (control WS up)", register 10350 bytes, no rollback. The
+  serial config was re-applied after the reboot (9600 8N1, the peer
+  setup; config does not survive a reboot) and the external page was
+  opened remotely for the user's visual check of the colours. Note:
+  from this run on, the user says OTA needs no per-run go-ahead —
+  build, OTA and verify directly.
 - (README + AGENTS.md already updated to the colours and pushed.)
