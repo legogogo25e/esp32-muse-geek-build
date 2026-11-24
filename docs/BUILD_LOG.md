@@ -514,6 +514,15 @@ status, Muse Link text + image, OTA, reboot.
   artifact: a read issued in the instant after the job's target
   reset returned all zeros once; an immediate re-read was
   correct.
-- Still open: the edit → rebuild → reflash loop with serial
-  printf proof waits on the target UART landing on PA9/PA10 (it
-  currently appears to sit on PB10/PB11) and NRST on RES.
+- Wiring correction (later the same day): the earlier note that
+  the target UART sat on PB10/PB11 with NRST unconnected was a
+  misreading of the user's photo — the user pointed this out and
+  both were then proven empirically. Serial is bidirectional on
+  PA9/PA10: the template's 1 Hz `heartbeat seq=N` lines stream
+  into the chat-post side chat, and a `serial.write` of
+  "hello pill" came back as the template's echo
+  `RX[11]: hello pill`. NRST is wired: with RCC_CSR (0x40021024)
+  flags cleared and read back as 0, a `swd.reset` hardware pulse
+  (GPIO6) set exactly PINRSTF (0x04000000); a sysreset set
+  SFTRSTF. The edit → rebuild → reflash → serial-proof loop is
+  fully closed.
