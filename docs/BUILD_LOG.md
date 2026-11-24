@@ -473,3 +473,47 @@ status, Muse Link text + image, OTA, reboot.
   flash 64 KB, UID read, RDP off, core halted, `profile_ok` true.
   `i2c.*` / `gpio.*` refused during the session and worked again
   after `swd.disconnect`; the target was left running.
+
+## Run #30 — SWD steps 2+3: session commands, stm32.* flash chain, flash_file (USB-flashed, real-target verified)
+
+- Upstream `esp32-muse-geek` @ `dc806468`: session commands
+  (`swd.read_mem` / `swd.write_mem` / `swd.halt` / `swd.run` /
+  `swd.regs` / `swd.reset`), the STM32F1 register-method flash
+  chain (`main/geek_stm32.c`: `stm32.flash_begin` / `flash_chunk` /
+  `stm32.flash_program` / `stm32.flash_status` / `stm32.erase` /
+  `stm32.read_flash`), and `stm32.flash_file`. Two builds: GitHub
+  run 45363313902 (steps 2+3) and run 45366390532 (adds
+  flash_file); final app 1,708,032 B, sha256 `cfdf28b8…`; both
+  manifests verified (5 files, addresses, app SHA).
+- **OTA still unavailable** (platform-side, see run #29); both
+  builds were flashed over USB with the flasher page.
+- Step 2 verified on the real Blue Pill (STM32F103C8T6): vector
+  read of the old firmware (SP 0x20005000 / Reset 0x080039E4),
+  regs (PC 0x08001cd8), a RAM write/read round-trip byte-exact,
+  run, and a sysreset the session survived.
+- Step 3's first attempt never touched the flash: the 18,716 B
+  template image was staged through agent-relayed base64 chunks;
+  every chunk's cumulative length checked out, but
+  `flash_program`'s SHA-256 gate rejected the staged image — a
+  same-length transcription corruption somewhere in the relay.
+  The gate did its job. Conclusion: agent-relayed base64 is not a
+  firmware transport at KB scale.
+- Fix (this run): `stm32.flash_file {path, sha256, erase?,
+  verify?}` — the board fetches the file itself with ranged
+  `GET /fs/raw/<path>` over the Link session (the
+  `display.draw_file` machinery; geek_stm32.c keeps its own
+  generation-token fetch state), stages it, and runs the
+  identical program flow behind the same SHA gate.
+- Verified end to end: `stm32.flash_file` on the VM-built
+  template (`Bluepill_Template_C8.bin`, 18,716 B, sha256
+  `b61f3376…`) returned programmed 18716 / verified true /
+  19 pages / reset in 8,396 ms. The vector table afterwards read
+  SP 0x20005000 / Reset 0x08003569 (the template; was
+  0x080039E4), the core halted at PC 0x080009f6 inside the new
+  image, then ran; disconnect left I2C and GPIO6 working. One
+  artifact: a read issued in the instant after the job's target
+  reset returned all zeros once; an immediate re-read was
+  correct.
+- Still open: the edit → rebuild → reflash loop with serial
+  printf proof waits on the target UART landing on PA9/PA10 (it
+  currently appears to sit on PB10/PB11) and NRST on RES.
