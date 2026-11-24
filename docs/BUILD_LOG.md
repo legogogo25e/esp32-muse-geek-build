@@ -442,122 +442,34 @@ status, Muse Link text + image, OTA, reboot.
   reboot (9600 8N1, the peer setup).
 - (README + AGENTS.md already updated to gpio.pull and pushed.)
 
-## Run #24 — message draws leave the external page (build + OTA verified)
+## Run #29 — SWD step 1: swd.connect / swd.disconnect (USB-flashed, real-target verified)
 
-- Upstream `a46988a7`, built 2026-11-12 11:44:39 HKT, app 1,642,496 B,
-  sha256 `e526965b…`. GitHub run 43149828006 (#25), success. Manifest
-  verified: same 5 addresses, upstream matches the pushed head,
-  downloaded SHA matches.
-- The bug (found live 2026-11-12): with the external-devices page on,
-  `device.display` drew the message but left `s_external_mode` set, so
-  the page's 500 ms refresh (`lcd_external_refresh`) redrew the page
-  over the message within a frame — while `device.message_ack` still
-  reported `showing=true`, so the message looked delivered when it was
-  never visible. The workaround (show_animation first, then display)
-  proved the diagnosis before the fix.
-- The fix (`main/led_status.c`): both message draw paths —
-  `led_status_draw_text` and `lcd_draw_image_rect` (the latter also
-  covers chunked and fetched images) — clear `s_external_mode` under
-  the LCD lock when they draw, Geek-gated. The status bar then picks
-  the clock back up by itself (its centre text changes). Regression
-  test `test_message_draws_leave_the_external_page` in
-  `tests/test_geek_external_page.py`; repo AGENTS.md external-page
-  section updated to state the symmetry (page replaces message,
-  message replaces page).
-- Tests: affected modules 69/69 (incl. the unused-symbol check);
-  full suite minus `test_avatar_install`: 3 failures + 11 errors, the
-  known environmental baseline (IDF managed components / FreeInk),
-  no new regressions.
-- OTA applied first try; board back with "OTA image validated", no
-  rollback, health ok. Serial config re-applied after the reboot
-  (9600 8N1, the peer setup). On-board reproduction of the original
-  failure: external page opened (double BOOT), then a bare
-  `device.display` with no preceding `show_animation` — the message
-  (seq 1 on the new firmware) stayed up past several 500 ms refresh
-  cycles instead of being overwritten.
-
-## Run #25 — chat-post experiment round 1 (build + OTA verified, post rejected)
-
-- Upstream `esp32-muse-geek` @ `709a0c21` (app commit `10a549e7`):
-  experiment in `main/app.c` — a task reads complete lines from UART1
-  and posts each to `/chat/stream` on the device's own session via
-  `noise_ctrl_req_*`, body copied from the Linux SDK's `send_chat`
-  (`message` / `output_modality` / `device_id` / `session_id` =
-  `geek-serial-experiment`). App 1,642,496 B, sha256 `47dfb3da…`.
-  GitHub run 43161796719, success; manifest verified; OTA applied,
-  "OTA image validated", no rollback.
-- On board: the task captured the test line (`chat post test 3321`).
-  The first send was lost to a gateway outage (server reset the
-  session, two WS upgrades answered 502) because the round-1 code
-  dropped lines while disconnected. The second send reached the VM
-  and was answered **HTTP 400** (empty body) — the path and the
-  device are accepted, the body shape is not.
-- Host tests: `tests/test_geek_chat_post.py` (new) plus neighbours,
-  49/49.
-
-## Run #26 — chat-post experiment round 2 (build + OTA verified, post accepted)
-
-- Upstream `esp32-muse-geek` @ `1a143169` (app commit `69fffdac`):
-  the post body is now exactly the ESP32 Muse chat client's
-  text turn (`message` / `output_modality` only — no `device_id`,
-  no `session_id`), and the task queues the newest line while the
-  session is down and posts it on reconnect (a sent post clears the
-  queue whatever status the VM answers). App 1,642,496 B, sha256
-  `12caee3e…`. GitHub run 43164381493, success; manifest verified;
-  OTA applied, "OTA image validated", no rollback.
-- End-to-end proof with TX shorted to RX (loopback): the agent sent
-  `loopback chat post test 777\n` via `serial.write`; board log —
-  `queued line` at 90.592 s, `posted line (66 bytes)` at 90.593 s,
-  **`post reply: HTTP 200`** at 91.127 s — and the line appeared in
-  the user's **main chat** as a user turn ~0.6 s later, waking the
-  agent there. Verdict: **a Link-only device can wake the agent by
-  posting to the chat; no polling needed.** Which of round 1's two
-  extra fields caused the 400 was not bisected further.
-- Consequence while this firmware runs: every complete UART1 line
-  is posted to the main chat, and the task consumes the RX stream
-  (the agent's pull-based `serial.read` sees nothing). Experiment
-  behaviour, kept deliberately until the production design lands.
-
-## Run #27 — chat-post experiment round 3 (build + OTA verified, side-chat routing works)
-
-- Upstream `esp32-muse-geek` @ `0fa0d65f` (app commit `57765a1e`):
-  the post body adds back `session_id` alone, in UUID form
-  (`6dec2000-1234-4abc-8def-0123456789ab`); `device_id` stays out.
-  App 1,642,496 B, sha256 `a1295157…`. GitHub run 43166502403,
-  success; manifest verified; OTA applied (the invoke timed out at
-  30 s but the board downloaded, rebooted and validated — judged by
-  uptime + log, per the runbook), "OTA image validated".
-- Loopback self-test: `sidechat uuid test 888\n` via `serial.write`;
-  board log — queued 94.759 s, posted (113 bytes) 94.760 s,
-  **post reply: HTTP 200** at 96.268 s. A new side chat appeared
-  whose chat_id is exactly the UUID, auto-titled "Test Sidechat
-  uuid", holding the line as a user turn and an agent reply.
-- Verdict: **side-chat routing works with a UUID session_id.** The
-  round-1 HTTP 400 is explained by its non-UUID session string
-  (`geek-serial-experiment`); `device_id`'s individual effect was
-  never isolated and remains untested. Production shape is now
-  known end to end: local event → post {message, output_modality,
-  session_id: <fixed UUID>} → dedicated side chat wakes its agent,
-  main chat untouched.
-
-## Run #28 — chat-post round 4 (build + OTA verified, new side chat live)
-
-- Upstream `esp32-muse-geek` @ `39826187` (app commit `ad696e5a`):
-  fresh session UUID `6dec2001-1234-4abc-8def-0123456789ab` (round
-  3's was burned when its chat was deleted — posts to a deleted
-  session get HTTP 404, the VM never recreates it), control bytes
-  (< 0x20, 0x7F) are filtered out of the line assembly (a stray NUL
-  once truncated a user sentence to an empty post, HTTP 400), CR
-  terminates a line as well as LF, and the queued log now carries
-  the byte count. App 1,642,496 B, sha256 `4f5b8359…`. GitHub run
-  43169121212, success; manifest verified; OTA applied, "OTA image
-  validated", no rollback.
-- Verified end to end by the user: a serial question ("what is
-  HK.700 stock realtime price? answer me at geek lcd") created the
-  new side chat under the round-4 UUID, its agent answered and put
-  the price on the Geek LCD itself — the full device → agent →
-  screen loop with no polling and no main-chat involvement.
-- Operational rule: do not delete that side chat. If it is ever
-  deleted, the UUID must be rotated again (new build + OTA); a
-  404-fallback (re-post to the main chat) is the known alternative
-  and is not implemented.
+- Upstream `esp32-muse-geek` @ `1f91fbf0`: new `main/geek_swd.c/.h`
+  — a bit-banged SWD master (SWCLK GPIO16 / SWDIO GPIO17 / nRESET
+  GPIO6), CMSIS-DAP-shaped transfers with the WAIT/FAULT discipline,
+  an AHB-AP memory layer, and pin arbitration with I2C/GPIO through
+  the geek_external claim/release. `swd.connect` (fingerprint +
+  halt, STM32F103 profile gate) and `swd.disconnect` are the only
+  commands exposed in this step. The register print cap rose
+  16384 → 24576 (register now 12,711 B). Two builds: GitHub run
+  45354911657 (v1) and run 45360634014 (the fix below); final app
+  1,642,496 B, sha256 `a83bcc01…`; both manifests verified.
+- **OTA was unavailable for this run**: `device.ota` has
+  disappeared from the platform's invokable command list (invokes
+  are rejected before reaching the board; the firmware still
+  registers it, and fresh registrations — `swd.*` included — do
+  arrive in the list). Both builds were flashed over USB with the
+  flasher page instead; NVS (pairing, Wi-Fi) untouched.
+- The first on-board connect failed with a protocol error at every
+  clock and reset combination. Root cause was in the firmware, not
+  the wiring: the SWD pins were configured `GPIO_MODE_OUTPUT`,
+  which disables the pad input path, so SWDIO read back as a
+  constant 0. Fixed to `GPIO_MODE_INPUT_OUTPUT` and added a raw-ACK
+  log line — "bad ack 7" then proved the input path alive and the
+  line silent until the target's SWCLK/SWDIO pair was oriented
+  correctly (the original orientation was right).
+- Verified against a real Blue Pill (STM32F103C8T6): DP
+  0x1BA01477, AP IDR 0x14770011, DBGMCU 0x20036410 (DEV_ID 0x410),
+  flash 64 KB, UID read, RDP off, core halted, `profile_ok` true.
+  `i2c.*` / `gpio.*` refused during the session and worked again
+  after `swd.disconnect`; the target was left running.
