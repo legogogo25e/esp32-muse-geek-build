@@ -750,5 +750,10 @@ status, Muse Link text + image, OTA, reboot.
   built 2026-11-25T17:44:14+08:00. Manifest verified: 5 files at the
   standard addresses; app 1,708,032 B, SHA-256
   f3b65263eb2a (prefix; full hash in manifest), binary contains `geek.ota`.
-- Board acceptance: pending one USB bootstrap flash; then verify
-  `geek.ota` appears in `device.describe` and self-test a remote update.
+- Board acceptance: PASSED (2026-11-25 ~17:46). User USB-flashed the
+  bootstrap build; `device.describe` lists `geek.ota` (url + force);
+  `geek.ota` self-test with the Pages URL and `force: true` returned
+  `{status: applied, rebooting: true}`; after reboot the log shows
+  PENDING_VERIFY then `OTA image validated (control WS up)`, config
+  persisted (serial on, h1=swd, pin6=adc, chat_post off). Remote updates
+  are restored via `geek.ota`.
