@@ -637,6 +637,53 @@ status, Muse Link text + image, OTA, reboot.
   Build job passed first try; the Publish job failed transiently
   at Deploy to GitHub Pages (third time) and succeeded on
   `gh run rerun --failed`.
+- Board acceptance: PASSED 2026-11-25 ~14:47 (user USB-flashed
+  1.0.0-beta.20cccc7): probe log `fingerprint: … halted 0`,
+  model read `STM32F103 64KB`, heartbeats 639→670 continuous
+  across the page open. Regression check found two separate
+  issues (see run #34): an intermittent session-resume stall
+  (~61 s of silence after one connect/disconnect; self-recovered)
+  and a ~4 min chat_post delivery stall (beats accumulated in
+  the ring, then resumed; one serial.read blocked the Link worker
+  ~106 s and the tunnel re-established). Both are pre-existing,
+  not regressions of this fix.
+
+## Run #34 — verified SWD resume on disconnect (2026-11-25)
+
+- Follow-up to run #33's regression finding: a plain
+  `swd.connect` + `swd.disconnect` once left the target not
+  printing for ~61 s, and the disconnect still reported success.
+  Root cause in the firmware: `geek_swd_run()` was a
+  fire-and-forget DHCSR_RUN write (never checked S_HALT cleared)
+  and `geek_swd_disconnect()` ignored its return value.
+- Fix (TDD, 6 new host tests in GeekSwdResumeTest): new
+  `poll_dhcsr_bit_clear()`; `geek_swd_run()` writes DHCSR_RUN
+  then polls until S_HALT clears (100 ms), retries the write +
+  poll once, and translates a poll timeout into the new
+  `GEEK_SWD_ERR_RESUME` code; `geek_swd_disconnect()` releases
+  the session either way but returns the run error, so a stuck
+  resume is reported instead of a silent success; the
+  `swd.disconnect` handler tells a resume failure apart from
+  "no session" and `swd_err_message` names it ("the target core
+  did not resume (S_HALT stayed set); retry swd.connect, or
+  reset the target"). Docs: README disconnect bullet + header
+  comment. Full suite 662 tests: 3 failures + 11 errors, the
+  known environmental baseline, no regressions (662 = 657 + 5
+  new; a 6th ordering test was added after the first build
+  attempt, see below).
+- First build attempt (run 45568091707) FAILED at compile:
+  `swd_op_error` was defined after `swd_disconnect_command`,
+  so the new call in the disconnect handler hit
+  `-Werror=implicit-function-declaration`. Fixed by moving the
+  helper above the disconnect handler (with a comment) and
+  adding a host test pinning the definition order. Affected
+  modules 132/132 pass.
+- GitHub run 45569034133; manifest verified: `project_version`
+  `1.0.0-beta.ec8a658`, upstream `ec8a6582…`, app 1,708,032 B,
+  sha256 `8a6ed9c1…` (matches the downloaded binary), binary
+  contains `did not resume` (2) / `device.features` (4). Build
+  and Publish jobs both passed first try.
 - Board acceptance: pending — user to USB-flash (device.ota still
-  platform-blocked), then open the SWD page and confirm the
-  heartbeats keep flowing.
+  platform-blocked), then run repeated connect/disconnect cycles
+  and confirm heartbeats resume within a few seconds each time;
+  the probe still works (page open, heartbeats continuous).
