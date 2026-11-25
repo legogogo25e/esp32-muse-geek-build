@@ -26,11 +26,15 @@
 # Actions > Build ESP32 firmware > Run workflow > pick upstream_ref / version
 # -- or push a change to this workflow file, which also triggers a run.
 #
-# DRAFT — adapted from legogogo25e/muse-gadget-build
-# .github/workflows/build-esp32.yml (read 2026-11-10). NOT yet uploaded:
-# workflow files can only be uploaded via the browser (GitHub App has no
-# workflows permission; API push returns 403). Validate YAML locally
-# before uploading, and verify the file exists with a read tool after.
+# Versioning (2026-11-25): a run with no project_version builds a beta,
+# "1.0.0-beta.<upstream short SHA>" (the "Resolve firmware version" step
+# computes it); pass e.g. 1.0.1 for a staged release (next staged: 1.0.1).
+# Bump the "1.0.0-beta." base in that step when a staged release ships.
+# The firmware's top bar shows "beta.<sha>" on beta builds, "v<version>"
+# on staged ones. NOTE: this file cannot be pushed via the gh API — the
+# token has no `workflow` scope (403); edit it in the browser with the
+# user's GitHub login. Validate YAML locally before uploading, and verify
+# the file exists with a read tool after.
 name: Build ESP32 firmware
 
 on:
@@ -53,9 +57,9 @@ on:
         default: "main"
         type: string
       project_version:
-        description: "Firmware version (PROJECT_VER, e.g. 1.0.0; OTA skips if not newer)"
-        required: true
-        default: "1.0.0"
+        description: "Firmware version (PROJECT_VER). Leave empty for a beta build (1.0.0-beta.<upstream short SHA>); set e.g. 1.0.1 for a staged release. OTA skips if not newer"
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -67,10 +71,12 @@ jobs:
     runs-on: ubuntu-latest
     container: espressif/idf:v6.0.3
     timeout-minutes: 60
+    outputs:
+      project_version: ${{ steps.ver.outputs.project_version }}
     env:
       BOARD: ${{ inputs.board || 'waveshare-s3-geek' }}
       UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
-      PROJECT_VER: ${{ inputs.project_version || '1.0.0' }}
+      PROJECT_VER: ${{ inputs.project_version }}
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -85,6 +91,19 @@ jobs:
           path: upstream
           persist-credentials: false
           token: ${{ secrets.UPSTREAM_REPO_TOKEN }}
+
+      - name: Resolve firmware version
+        id: ver
+        working-directory: upstream
+        run: |
+          if [ -n "$PROJECT_VER" ]; then
+            ver="$PROJECT_VER"
+          else
+            ver="1.0.0-beta.$(git rev-parse --short HEAD)"
+          fi
+          echo "project_version=$ver" >> "$GITHUB_OUTPUT"
+          echo "PROJECT_VER=$ver" >> "$GITHUB_ENV"
+          echo "firmware version: $ver"
 
       - name: Map board to target and sdkconfig defaults
         id: board
@@ -166,7 +185,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     env:
       BOARD: ${{ inputs.board || 'waveshare-s3-geek' }}
-      PROJECT_VER: ${{ inputs.project_version || '1.0.0' }}
+      PROJECT_VER: ${{ needs.build.outputs.project_version }}
     steps:
       - name: Checkout this repo (for flasher page)
         uses: actions/checkout@v4
