@@ -735,3 +735,20 @@ status, Muse Link text + image, OTA, reboot.
   (reboot): persisted `chat_post:false`, `serial.read` works
   again (seq 4335+). Board left with posting off, per the
   user's choice.
+
+## Run #36 — geek.ota remote update command (2026-11-25)
+
+- Upstream muse-gadget-sdk removed the standard `device.ota` Link command
+  (PR #402, merged 2026-11-14); the platform no longer exposes it for this
+  board, so agent OTA invokes were rejected before reaching the firmware.
+- This build exposes the same OTA engine as `geek.ota` (registration +
+  link.invoke handler in `noise_control.cpp`; BLE setup-time `device.ota`
+  unchanged). Tests: affected modules 49/49; full suite 668 tests with only
+  the known baseline (3 failures + 11 errors).
+- Build run 45587671464: Build + Publish both SUCCESS. Version
+  `1.0.0-beta.127fc6f`, upstream `127fc6fcd259eac19aadedc1c250120bcc5e17f9`,
+  built 2026-11-25T17:44:14+08:00. Manifest verified: 5 files at the
+  standard addresses; app 1,708,032 B, SHA-256
+  f3b65263eb2a (prefix; full hash in manifest), binary contains `geek.ota`.
+- Board acceptance: pending one USB bootstrap flash; then verify
+  `geek.ota` appears in `device.describe` and self-test a remote update.
