@@ -683,7 +683,14 @@ status, Muse Link text + image, OTA, reboot.
   sha256 `8a6ed9c1…` (matches the downloaded binary), binary
   contains `did not resume` (2) / `device.features` (4). Build
   and Publish jobs both passed first try.
-- Board acceptance: pending — user to USB-flash (device.ota still
-  platform-blocked), then run repeated connect/disconnect cycles
-  and confirm heartbeats resume within a few seconds each time;
-  the probe still works (page open, heartbeats continuous).
+- Board acceptance: PASSED 2026-11-25 ~15:51 (user USB-flashed
+  1.0.0-beta.ec8a658): version + config {serial:true, h1:"swd",
+  pin6:"adc"} confirmed; three connect/disconnect cycles, each
+  resumed promptly (beats consecutive, ~2 s spacing, no gap —
+  cycle 1: 2454–2460, cycle 2: 2477–2484, cycle 3: 2499–2506);
+  probe still works on the new firmware (page open:
+  `fingerprint: … halted 0`, `probe: target STM32F103 64KB`,
+  beats 2512→2513 exactly on schedule, continuous through
+  2531+). No session left open; board clean. The chat_post
+  delivery stall (~4 min, seen during run #33 verification) did
+  not recur in this session and remains a separate open item.
