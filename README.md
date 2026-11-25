@@ -18,7 +18,7 @@
 - 清单：https://legogogo25e.github.io/esp32-muse-geek-build/manifest.json
 - 板子清单：https://legogogo25e.github.io/esp32-muse-geek-build/firmware/waveshare-s3-geek/manifest.json
 
-`manifest.json` 的结构（`boards.<board>` 里）：`board` / `target` / `project_version` / `upstream_sha` / `idf_version` / `built_at_utc` / `github_run`，以及 `flash`（`mode` / `freq` / `size`）和 `files` 数组，每项含 `name` / `url`（相对路径）/ `address`（十进制烧录地址）/ `size` / `sha256`。
+`manifest.json` 的结构（`boards.<board>` 里）：`board` / `target` / `project_version` / `upstream_ref` / `upstream_sha` / `idf_version` / `built_at_hkt` / `built_at_utc` / `github_run`，以及 `flash`（`mode` / `freq` / `size`）和 `files` 数组，每项含 `name` / `url`（相对路径）/ `address`（十进制烧录地址）/ `size` / `sha256`。
 
 **烧录地址一律以 manifest / `flasher_args.json` 为准，不要硬编码 IDF 默认值。** muse-gadget 的实测地址（S3 板）：分区表 `0x10000`（不是 IDF 默认的 0x8000）、app（muse-gadget.bin）`0x20000`（ota_0 槽）；bootloader 地址和 flash 参数以本次编译的 manifest 为准。
 
@@ -40,15 +40,15 @@
 2. 点 **Run workflow**，选：
    - `board`：默认 `waveshare-s3-geek`
    - `upstream_ref`：默认 `main`，想钉死就填源码仓的 commit SHA
-   - `project_version`：默认 `1.0.0`。OTA 有版本门：新版本不比运行中的新会被跳过，所以每次发新版都要涨版本号
-3. 等运行变绿，点进那次运行，到底部 **Artifacts** 下载 `firmware-waveshare-s3-geek-1.0.0`。
+   - `project_version`：默认留空，自动用 `1.0.0-beta.<源码 short SHA>`；阶段发布才显式传版本（下一阶段 1.0.1）。OTA 有版本门：不比运行中新的镜像会被跳过，同版重装要在 `geek.ota` 里加 `force`
+3. 等运行变绿，点进那次运行，到底部 **Artifacts** 下载 `firmware-waveshare-s3-geek-<project_version>`。
 4. 也可以直接 push 改动到 `.github/workflows/build-esp32.yml`，push 到 main 也会触发一次（默认就编 Geek 板）。
 
 ## 拿到 .bin 后怎么烧
 
 首次烧录必须走 USB 串口（空片没有 OTA 代码）：用 Pages 上的 `flasher.html`，或按产物里的 `flasher_args.json` 的地址用 esptool 烧。
 
-之后更新可走 Wi-Fi OTA：把 `muse-gadget.bin` 放到 GitHub Pages 上，用 `device.ota` 命令给板子一个 HTTPS URL，板子自己下载、校验、重启。新固件启动后 300 秒内连不上控制通道会自动回滚。
+之后更新可走 Wi-Fi OTA：把 `muse-gadget.bin` 放到 GitHub Pages 上，用 `geek.ota` 命令给板子一个 HTTPS URL，板子自己下载、校验、重启。新固件启动后 300 秒内连不上控制通道会自动回滚。（上游 SDK 已移除标准 `device.ota` Link 命令，Geek 固件用自己的 `geek.ota`，同一套 OTA 引擎。）
 
 ## 常见问题
 
