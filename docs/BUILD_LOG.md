@@ -526,3 +526,80 @@ status, Muse Link text + image, OTA, reboot.
   (GPIO6) set exactly PINRSTF (0x04000000); a sysreset set
   SFTRSTF. The edit → rebuild → reflash → serial-proof loop is
   fully closed.
+
+## Run #31 — feature configuration: `device.features` pin-function assignment (USB-flashed, acceptance matrix passed)
+
+- Upstream `esp32-muse-geek` @ `9f4463dd`: `main/geek_features.c`
+  (NVS keys `feat_serial` / `feat_h1` / `feat_pin6`, defaults
+  on / i2c / adc; shared coerce: `pin6: rst` falls back to adc
+  unless `h1: swd`), registration gating in
+  `build_register_json()` + `device.features` command, reboot
+  semantics (reply first, then `restart_task`), hardware-init
+  gating in `geek_external_init()` (UART1 / I2C bus / ADC only
+  when configured), retired SWD/I2C bus arbitration (claim/release
+  only flip the ownership flag), config-driven external page
+  (sections collapse upward; SWD section 3 green rows incl.
+  `RST (IO6)`), and the Geek Config Space 「外接功能」 section
+  (slug `geek-pei-zhi` at the time). GitHub run 45543019501;
+  app 1,708,032 B, sha256 `d6152160…`; manifest verified.
+- Two build failures on the way: run 45541394696 failed at link
+  (`geek_features.h` lacked `extern "C"` guards for the C++
+  register builder), and the first 45541939587 publish failed
+  transiently at deploy-pages (rerun of the failed job fixed it).
+  A board-side bug was found after the first flash:
+  `device.features` returned a bare payload without the
+  `{"ok": true, "payload": {...}}` envelope and the invoke failed
+  as `device_error: unknown` (fixed + host test, run
+  45543019501).
+- Acceptance matrix, all passed on the real board (2026-11-25):
+  defaults `{serial: true, h1: "i2c", pin6: "adc"}`;
+  switch to `{h1: "swd", pin6: "rst"}` (reboot, fingerprint
+  exact, `i2c.scan` unregistered in SWD mode); `h1` back to i2c
+  while `pin6: rst` coerced to adc (`pin6_coerced: true`);
+  illegal `{pin6: "rst"}` with `h1: i2c` refused; serial off/on
+  (heartbeat posts stop / resume); external page in the SWD combo
+  confirmed by the user ("一致"). Full suite 646 tests: 3
+  failures + 11 errors, the known environmental baseline.
+- `device.ota` still platform-blocked; the user USB-flashed
+  twice. Board left in `{serial: true, h1: "swd", pin6: "rst"}`
+  for the follow-on work.
+
+## Run #32 — follow-ons: SWD target-model row, beta versioning, chain link icon (USB-flashed, 1.0.0-beta.ea72c80)
+
+- Upstream `esp32-muse-geek` @ `ea72c808`: SWD model row on the
+  external page (one-shot probe on page open: connect, read the
+  fingerprint, disconnect; `geek_swd_model_str()` maps DEV_ID +
+  flash size, e.g. `STM32F103 64KB`, `SWD no target` on failure;
+  live fingerprint while a session is open), version display
+  (`lcd_version_short()`: dev builds `beta.<short SHA>`, staged
+  releases `v<version>`), and the status-bar chain icon (green
+  interlocked links when connected, red broken links when
+  offline; replaces the dot + "Connected" word on both pages).
+  Full suite 655 tests: 3 failures + 11 errors, the known
+  environmental baseline, no regressions.
+- Workflow change (`.github/workflows/build-esp32.yml`, commit
+  `e33d04e`, made through the browser — the `gh` token has no
+  `workflow` scope, API pushes 403): new "Resolve firmware
+  version" step defaults `PROJECT_VER` to
+  `1.0.0-beta.<upstream short SHA>` when no version is passed;
+  staged releases pass an explicit version (next staged: 1.0.1).
+  GitHub run 45554851669; manifest verified: `project_version`
+  `1.0.0-beta.ea72c80`, upstream `ea72c808…`, app 1,708,032 B,
+  sha256 `9d467ac1…`, binary contains `SWD no target` /
+  `STM32F103` / `device.features`. Build job passed first try;
+  the Publish job failed transiently at Deploy to GitHub Pages
+  (same hiccup as run 45541939587) and succeeded on
+  `gh run rerun --failed`. Lesson: `gh run watch | tail` exits 0
+  through `tail` — trust only `gh run view --json
+  status,conclusion`.
+- Board acceptance (2026-11-25, user USB-flashed): `device.health`
+  reports `1.0.0-beta.ea72c80`; config survived the flash;
+  probe log `probe: target STM32F103 64KB`; `swd.connect` /
+  `swd.disconnect` clean. Board restored to defaults
+  `{serial: true, h1: "i2c", pin6: "adc"}` through the rebuilt
+  Geek Config Space (slug `geek-config`, English; old
+  `geek-pei-zhi` deleted) — request #1 applied end to end, though
+  the apply task did not write the snapshot back and it was
+  filled in manually (`features` + firmware fields verified on
+  read-back). Screen eyeball check (model row, beta top bar,
+  chain icon) still pending with the user.
