@@ -694,3 +694,44 @@ status, Muse Link text + image, OTA, reboot.
   2531+). No session left open; board clean. The chat_post
   delivery stall (~4 min, seen during run #33 verification) did
   not recur in this session and remains a separate open item.
+
+## Run #35 — chat_post posting switch, default OFF (2026-11-25)
+
+- Trigger: user asked whether the automatic posting of UART1
+  lines to the side chat can be controlled by the agent, and
+  approved a dedicated switch; then set the factory default to
+  OFF ("默认关闭吧").
+- Change: `chat_post` joins the feature configuration
+  (geek_features): persisted in NVS (`feat_chat_post`), factory
+  default **off**; `device.features` accepts/reports it like the
+  other three fields (change takes effect by reboot). The
+  chat_post task now starts only when `serial && chat_post`, so
+  with posting off nothing drains the UART1 RX ring and the
+  agent's `serial.read` sees the lines instead (the task and
+  serial.read consume the same ring — mutually exclusive per
+  byte). Single start site pinned by test. TDD: 4 new/updated
+  host tests (defaults+persistence, registration param, handler
+  report/accept, gate + single start site). Affected modules
+  136/136 pass; full suite 667 tests: 3 failures + 11 errors,
+  the known environmental baseline, no regressions (667 = 662 +
+  1 ordering test from run #34 + 4 new).
+- A default-ON build was produced first (run 45576461998, Build
+  ok / Publish transient failure) and superseded by the user's
+  default-OFF decision before any flash; not published further.
+- GitHub run 45577139204; manifest verified: `project_version`
+  `1.0.0-beta.b797809`, upstream `b797809c…`, app 1,708,032 B,
+  sha256 `12b72adf…` (matches the downloaded binary), binary
+  contains `feat_chat_post` / `chat_post must be a boolean`.
+  Publish job failed transiently once, rerun succeeded.
+- Board acceptance: PASSED 2026-11-25 ~16:55 (user USB-flashed
+  1.0.0-beta.b797809): `device.features` reported
+  {serial:true, h1:"swd", pin6:"adc", chat_post:false} — the
+  factory default, no stored key; boot log
+  `features: serial=on h1=swd pin6=adc chat_post=off` with no
+  chat_post task and no queued lines; `serial.read` returned
+  heartbeat lines (seq 4255–4305, 1024 B, 176 B left). Turned
+  on (`chat_post:true`, reboot): `chat_post=on`, session from
+  NVS, posted HTTP 200 (seq 4320–4331). Turned back off
+  (reboot): persisted `chat_post:false`, `serial.read` works
+  again (seq 4335+). Board left with posting off, per the
+  user's choice.
