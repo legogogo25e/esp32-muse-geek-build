@@ -603,3 +603,40 @@ status, Muse Link text + image, OTA, reboot.
   filled in manually (`features` + firmware fields verified on
   read-back). Screen eyeball check (model row, beta top bar,
   chain icon) still pending with the user.
+
+## Run #33 — probe no-halt fix + GPIO6 pin ownership (2026-11-25)
+
+- Bug (user report 14:13): opening the SWD external page stopped
+  the STM32 — heartbeats froze at seq 2741 while SWD showed idle.
+  Reproduced on board: the page-entry probe ran a full
+  `geek_swd_connect`, which writes DHCSR_HALT; the target ended up
+  stuck in HAL_UART_Transmit's TC wait (PC 0x0800162c, g_seq 2742)
+  and did not resume after the probe's disconnect. Revived with
+  `swd.reset` sysreset (heartbeats restarted from seq 0; the
+  target had also recovered on its own to seq 2840+ before the
+  reset). The exact silicon-level chain (why TC never set / the
+  timeout never fired) is still open; the fix removes the trigger.
+- Fix (TDD, 2 new host tests): new `geek_swd_fingerprint()` — the
+  same switch/power-up/fingerprint sequence as connect, but it
+  never writes DHCSR and never freezes the watchdogs, so the core
+  keeps running; the probe task uses it instead of connect.
+  `geek_swd_connect` is now a thin wrapper over
+  `swd_connect_inner(..., halt=true)`; sessions still halt. Also
+  fixes the whole-branch review's Important finding: `pins_setup()`
+  / `pins_release()` only configure GPIO6 when `pin6 == rst`
+  (before, a session silently dropped a user-configured GPIO6
+  output and biased the ADC row with a pull-up). Docs updated
+  (probe wording in README/AGENTS.md, plus the stale Iron-rules
+  Connected/Offline line and the app size 1,576,960 → 1,708,032 B).
+  Full suite 657 tests: 3 failures + 11 errors, the known
+  environmental baseline, no regressions.
+- GitHub run 45562038130; manifest verified: `project_version`
+  `1.0.0-beta.20cccc7`, upstream `20cccc76…`, app 1,708,032 B,
+  sha256 `0c04c53a…` (matches the downloaded binary), binary
+  contains `fingerprint` (4) / `SWD no target` / `device.features`.
+  Build job passed first try; the Publish job failed transiently
+  at Deploy to GitHub Pages (third time) and succeeded on
+  `gh run rerun --failed`.
+- Board acceptance: pending — user to USB-flash (device.ota still
+  platform-blocked), then open the SWD page and confirm the
+  heartbeats keep flowing.
