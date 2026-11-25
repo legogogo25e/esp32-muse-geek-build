@@ -5,6 +5,12 @@ Firmware for the Waveshare ESP32-S3-GEEK (ESP32-S3R2, 16 MB flash,
 (private); this repo publishes the firmware + Pages flasher. ESP-IDF
 v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 
+Current status (2026-11-25): latest run #36, version
+`1.0.0-beta.127fc6f`, running on the board; remote updates go through
+`geek.ota` (upstream removed the standard `device.ota` Link command).
+The table below covers the early runs (#2–#23); later runs are the
+dated sections further down.
+
 ## Runs
 
 | Run | Upstream | Built (HKT) | App size | SHA (app) | Notes |
