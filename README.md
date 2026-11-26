@@ -40,7 +40,7 @@
 2. 点 **Run workflow**，选：
    - `board`：默认 `waveshare-s3-geek`
    - `upstream_ref`：默认 `main`，想钉死就填源码仓的 commit SHA
-   - `project_version`：默认留空，自动用 `1.0.0-beta.<源码 short SHA>`；阶段发布才显式传版本（下一阶段 1.0.1）。OTA 有版本门：不比运行中新的镜像会被跳过，同版重装要在 `geek.ota` 里加 `force`
+   - `project_version`：默认留空，自动用 `1.0.2-beta.<源码 short SHA>`；阶段发布才显式传版本（1.0.1 已发布，下一阶段 1.0.2）。OTA 有版本门：不比运行中新的镜像会被跳过，同版重装要在 `geek.ota` 里加 `force`
 3. 等运行变绿，点进那次运行，到底部 **Artifacts** 下载 `firmware-waveshare-s3-geek-<project_version>`。
 4. 也可以直接 push 改动到 `.github/workflows/build-esp32.yml`，push 到 main 也会触发一次（默认就编 Geek 板）。
 
