@@ -5,8 +5,8 @@ Firmware for the Waveshare ESP32-S3-GEEK (ESP32-S3R2, 16 MB flash,
 (private); this repo publishes the firmware + Pages flasher. ESP-IDF
 v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 
-Current status (2026-11-26): latest run #37, staged version
-`1.0.1`, running on the board; remote updates go through
+Current status (2026-11-26): latest run #38, version
+`1.0.2-beta.cf4b5b3`, running on the board; remote updates go through
 `geek.ota` (upstream removed the standard `device.ota` Link command).
 The table below covers the early runs (#2–#23); later runs are the
 dated sections further down.
@@ -795,3 +795,26 @@ status, Muse Link text + image, OTA, reboot.
 - Follow-up done: the workflow's beta base is now `1.0.2-beta.`
   (build-repo commit e542506, via the browser; the gh token has no
   workflow scope).
+
+### Run #38 — 2026-11-26 screenshot (display.screenshot)
+
+- New Link command `display.screenshot`: the ST7789 has no MISO
+  wired (write-only), so `lcd_draw()` mirrors every successful draw
+  into a PSRAM shadow framebuffer (240×135 RGB565). Capture freezes
+  the shadow under the LCD lock and serves an RLE stream
+  (`rgb565-rle`, pure-header codec `geek_screenshot_rle.h`) in
+  4096-byte base64 chunks; `chunk: 0` captures fresh, later chunks
+  serve the frozen frame. `tools/geek_screenshot.py` decodes chunks
+  to PNG. Limits: GRAM content only (physical defects invisible;
+  `backlight_on` flags a dark screen), animation frames may mix
+  two frames mid-draw.
+- Tests: new `test_geek_screenshot` (C-probe RLE round-trips +
+  wiring); full suite 685 tests, failures=3 / errors=11 = baseline.
+- Build run 45760559571: `1.0.2-beta.cf4b5b3`, app 1,773,568 B,
+  SHA-256 b5255b31…; manifest verified.
+- Board acceptance: PASSED (2026-11-26 ~13:40). OTA applied;
+  screenshots decoded and eyeballed by the agent: animation off
+  (status bar + black main area), reactor core animation, external
+  page top (version bar `beta.cf4b5b3`, cyan UART1 row), and a
+  Chinese text message rendered correctly. Error paths:
+  `chunk: 99` and `chunk: -1` both return `invalid_param`.
