@@ -27,9 +27,9 @@
 # -- or push a change to this workflow file, which also triggers a run.
 #
 # Versioning (2026-11-25): a run with no project_version builds a beta,
-# "1.0.0-beta.<upstream short SHA>" (the "Resolve firmware version" step
+# "1.0.2-beta.<upstream short SHA>" (the "Resolve firmware version" step
 # computes it); pass e.g. 1.0.1 for a staged release (next staged: 1.0.1).
-# Bump the "1.0.0-beta." base in that step when a staged release ships.
+# Bump the "1.0.2-beta." base in that step when a staged release ships.
 # The firmware's top bar shows "beta.<sha>" on beta builds, "v<version>"
 # on staged ones. NOTE: this file cannot be pushed via the gh API — the
 # token has no `workflow` scope (403); edit it in the browser with the
@@ -57,7 +57,7 @@ on:
         default: "main"
         type: string
       project_version:
-        description: "Firmware version (PROJECT_VER). Leave empty for a beta build (1.0.0-beta.<upstream short SHA>); set e.g. 1.0.1 for a staged release. OTA skips if not newer"
+        description: "Firmware version (PROJECT_VER). Leave empty for a beta build (1.0.2-beta.<upstream short SHA>); set e.g. 1.0.1 for a staged release. OTA skips if not newer"
         required: false
         default: ""
         type: string
@@ -99,7 +99,7 @@ jobs:
           if [ -n "$PROJECT_VER" ]; then
             ver="$PROJECT_VER"
           else
-            ver="1.0.0-beta.$(git rev-parse --short HEAD)"
+            ver="1.0.2-beta.$(git rev-parse --short HEAD)"
           fi
           echo "project_version=$ver" >> "$GITHUB_OUTPUT"
           echo "PROJECT_VER=$ver" >> "$GITHUB_ENV"
