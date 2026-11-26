@@ -842,3 +842,30 @@ status, Muse Link text + image, OTA, reboot.
   metadata + chunk 0 OK; `swd.connect` fingerprint profile_ok,
   `swd.disconnect` resumed STM32 heartbeats immediately
   (seq 6421+ via `serial.read`).
+
+### Run #40 — 2026-11-26 avatar sync (Phase 3)
+
+- `display.animation` gains mode `avatar`: follow the paired
+  Muse's current avatar still image. The identity reply's
+  `result.avatar` (image path + assets revision, parsed by the
+  ported `avatar_identity`) feeds `geek_animation`; the WebP is
+  fetched from the VM in ranged GETs (512 KB cap), decoded with
+  libwebp (decoder only, pinned v1.6.0 archive) to at most
+  112 px edge, held in PSRAM and drawn centred in the main area.
+  Cache is PSRAM-only (no files partition on this board): it
+  re-fetches after a reboot and whenever the identity revision
+  changes; until a fetch succeeds the built-in animation plays.
+  No partition change, OTA-able.
+- Tests: `GeekAvatarSyncTest` (5 tests, identity parser C probe);
+  full suite 700 tests, failures=3 / errors=11 / skipped=7 =
+  baseline.
+- Builds: 45771556766 FAILED (C++ mangling of
+  `avatar_identity_parse`; fixed with extern "C" guards),
+  45772653392 OK but the avatar fetch buffers exceeded the PSRAM
+  budget on board; 45773252194 `1.0.2-beta.55a9e20`, app
+  1,839,104 B, SHA-256 7a07fc97…; manifest verified.
+- Board acceptance: PASSED (2026-11-26 ~15:05). OTA applied and
+  validated; log shows `avatar identity updated` then
+  `avatar image loaded: 112x112`; `display.animation` reported
+  mode/avatar active/loaded. Board restored to builtin after
+  the check.
