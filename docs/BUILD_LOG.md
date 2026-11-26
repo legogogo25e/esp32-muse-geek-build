@@ -5,8 +5,8 @@ Firmware for the Waveshare ESP32-S3-GEEK (ESP32-S3R2, 16 MB flash,
 (private); this repo publishes the firmware + Pages flasher. ESP-IDF
 v6.0.3 only. Flash: dio/80m/keep; all 5 files, app at 0x20000.
 
-Current status (2026-11-25): latest run #36, version
-`1.0.0-beta.127fc6f`, running on the board; remote updates go through
+Current status (2026-11-26): latest run #37, staged version
+`1.0.1`, running on the board; remote updates go through
 `geek.ota` (upstream removed the standard `device.ota` Link command).
 The table below covers the early runs (#2–#23); later runs are the
 dated sections further down.
@@ -763,3 +763,35 @@ status, Muse Link text + image, OTA, reboot.
   PENDING_VERIFY then `OTA image validated (control WS up)`, config
   persisted (serial on, h1=swd, pin6=adc, chat_post off). Remote updates
   are restored via `geek.ota`.
+
+## Run #37 — SDK upgrade: configurable animation + Link ports (2026-11-26)
+
+- Selective ports from muse-gadget-sdk (e8d2c98) on branch
+  `upgrade/sdk-animation-config`, merged to main (ade7be4):
+  - Configurable status animation (`display.animation`): neutral
+    built-in reactor core (24 frames), off, or a custom `.ganim`
+    pack fetched from the VM, CRC-checked, played from PSRAM with
+    fallback to the built-in. The personal mascot assets left the
+    repo; the mascot pack lives on the VM only.
+  - `token_fp` (no more token-prefix logging), `link_events` /
+    `link_probe` (connectivity history in `device.health`), and
+    `tunnel_relay` (`net.forward` LAN port forwards + NAPT input
+    guard). `error_report` deliberately not ported (panic path).
+  - Apache-2.0 `LICENSE` added for the planned open-source release.
+- Tests: full suite 680 tests, failures=3 / errors=11 = the known
+  environmental baseline. Two build fixes along the way
+  (`-Werror=stringop-truncation`, tunnel harness stub).
+- Builds: beta run 45752057044 (`1.0.0-beta.ade7be4`, app
+  1,773,568 B, SHA-256 e42675a1…) then staged run 45752734814
+  (`1.0.1`, app SHA-256 b5b2b6cd…). Manifests verified (5 files,
+  standard addresses, size + SHA match).
+- Board acceptance: PASSED (2026-11-26 ~12:05). Beta OTA applied,
+  `OTA image validated`; `device.health` shows
+  `connectivity_events`; `display.animation` reports the reactor
+  built-in (24 frames), a custom mascot pack fetched and loaded
+  (`active: custom`), then back to builtin; `net.forward` UDP
+  open/close returned the expected expiries. Staged 1.0.1 OTA
+  applied without force; board running 1.0.1.
+- Follow-up: bump the workflow's beta base from `1.0.0-beta.` now
+  that 1.0.1 has shipped (workflow edit needs the browser; the gh
+  token has no workflow scope).
