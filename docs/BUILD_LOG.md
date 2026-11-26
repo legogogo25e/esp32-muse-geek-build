@@ -818,3 +818,27 @@ status, Muse Link text + image, OTA, reboot.
   page top (version bar `beta.cf4b5b3`, cyan UART1 row), and a
   Chinese text message rendered correctly. Error paths:
   `chunk: 99` and `chunk: -1` both return `invalid_param`.
+
+### Run #39 — 2026-11-26 product control migration (Phase 3)
+
+- Geek-only Link commands moved behind the SDK product-integration
+  hooks: registration now lives in
+  `components/geek_product_control/integration/geek_product_control_extension.inc`
+  (selected in the root CMakeLists, forwarded as build properties),
+  dispatch in `geek_product_command()` (main/app.c, NULL for non-Geek
+  commands). `main/noise_control.cpp` keeps only the three upstream
+  hooks plus the shared OTA engine (`geek.ota` unchanged). No
+  user-visible change: same commands, same feature gating, same
+  register content (17,480 bytes on the wire).
+- Tests: new `test_geek_product_control` (9 tests); registration
+  assertions repointed at the component .inc; full suite 695 tests,
+  failures=3 / errors=11 / skipped=7 = baseline.
+- Build run 45769387015: `1.0.2-beta.b635c64`, app 1,773,568 B,
+  SHA-256 d5b3b419…; manifest verified.
+- Board acceptance: PASSED (2026-11-26 ~14:45). OTA applied and
+  validated; `device.features` config intact (serial on, h1=swd,
+  pin6=adc, chat_post off); `gpio.adc` 3159 mV; external page probe
+  `fingerprint … halted 0`, model STM32F103 64KB; `display.screenshot`
+  metadata + chunk 0 OK; `swd.connect` fingerprint profile_ok,
+  `swd.disconnect` resumed STM32 heartbeats immediately
+  (seq 6421+ via `serial.read`).
