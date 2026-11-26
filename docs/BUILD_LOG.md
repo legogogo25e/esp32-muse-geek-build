@@ -792,6 +792,6 @@ status, Muse Link text + image, OTA, reboot.
   (`active: custom`), then back to builtin; `net.forward` UDP
   open/close returned the expected expiries. Staged 1.0.1 OTA
   applied without force; board running 1.0.1.
-- Follow-up: bump the workflow's beta base from `1.0.0-beta.` now
-  that 1.0.1 has shipped (workflow edit needs the browser; the gh
-  token has no workflow scope).
+- Follow-up done: the workflow's beta base is now `1.0.2-beta.`
+  (build-repo commit e542506, via the browser; the gh token has no
+  workflow scope).
