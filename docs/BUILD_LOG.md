@@ -869,3 +869,16 @@ status, Muse Link text + image, OTA, reboot.
   `avatar image loaded: 112x112`; `display.animation` reported
   mode/avatar active/loaded. Board restored to builtin after
   the check.
+
+### Run #41 — 2026-11-26 avatar colour fix
+
+- First on-board avatar screenshot showed swapped colours: the
+  WebP decoder emits byte-swapped RGB565 (`WEBP_SWAP_16BIT_CSP`),
+  so `lcd_draw_avatar_image` now byte-swaps pixels on the way
+  into the panel buffer.
+- Build 45774816544, `1.0.2-beta.1a0895e`, app 1,839,104 B.
+- Board acceptance (user-requested switch to avatar mode):
+  full 5-chunk screenshot assembly verified correct colours;
+  external-page round trip returns to the avatar; explicit
+  reboot keeps avatar mode and re-fetches the image. Board
+  left in avatar mode.
