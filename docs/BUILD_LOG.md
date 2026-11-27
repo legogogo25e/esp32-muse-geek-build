@@ -941,3 +941,16 @@ status, Muse Link text + image, OTA, reboot.
 - Board acceptance: OTA applied; serial.write "TXTEST hello"
   produced "#L 47583 tx TXTEST hello" in segment 6 with the
   #error/#warning RX filter enabled.
+
+## Run #46 — TF log format v2 (JSON Lines) (2026-11-27)
+- Build 46008518255, version 1.0.2-beta.24c90fe, merged to main
+  24c90fe.
+- Log records redesigned for AI-agent readability: one JSON
+  object per line (format geek-tflog/2). Types: segment_start
+  (boot_id, segment, started_at ISO-8601, time_quality, filter
+  object), time_anchor, rx/tx (uptime_ms, wall_time, text;
+  partial/context flags), filter_config, dropped. Text is JSON
+  escaped with valid UTF-8 preserved.
+- Board acceptance: OTA applied; segment 7 shows segment_start
+  + time_anchor + {"type":"tx",...,"text":"TXTEST v2"} with
+  matching ISO wall times. Old segments keep the v1 format.
