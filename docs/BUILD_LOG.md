@@ -954,3 +954,21 @@ status, Muse Link text + image, OTA, reboot.
 - Board acceptance: OTA applied; segment 7 shows segment_start
   + time_anchor + {"type":"tx",...,"text":"TXTEST v2"} with
   matching ISO wall times. Old segments keep the v1 format.
+
+## Run #47 — TF logger watchdog (2026-11-27)
+
+- Build run 46015798753, version 1.0.2-beta.c170256 (main c170256).
+- Watchdog inside the TF logger (approach A, triggers independent
+  of the record filter): `watchdog.config` (enabled, prefixes,
+  silence_ms, cooldown_ms, auto_reset, grace_ms,
+  max_resets_per_hour), pure state machine
+  `geek_tflog_watchdog.h`, shared chat poster extracted from
+  chat_post (`geek_chat_poster`), alerts to a dedicated side
+  chat (wd_sid). Spec/plan in source repo docs/superpowers/.
+- Board acceptance: filter=heartbeat + watchdog=#error → alerts
+  arrived while #error stayed out of the log (independence),
+  suppressed counts folded; hang-test STM32 firmware → silence
+  alert, SWD sysreset 1/2 and 2/2 with recovery, then reset-cap
+  alert. Session-deferral covered by host probe only.
+- Restored: heartbeat firmware, watchdog disabled, filter back
+  to #error,#warning post 1000 pre 0.
