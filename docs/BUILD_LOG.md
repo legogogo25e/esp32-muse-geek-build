@@ -913,3 +913,20 @@ status, Muse Link text + image, OTA, reboot.
   deleted and the list updated. The unsynced-to-archive
   transition itself was not observed on board (RTC kept time
   across OTA reboots); cold-boot check still pending.
+
+## Run #44 — TF log record filter (2026-11-27)
+- Build 45995094799, version 1.0.2-beta.27c8e20, merged to main
+  27c8e20.
+- log.config: enabled + up to 8 line prefixes (case-insensitive,
+  word-boundary), sliding post-match context window (0-10000 ms,
+  default 1000, re-armed by each match, context capped at 200
+  lines per trigger), optional pre-match context from a 16-line
+  RAM ring. Context lines are recorded as #L ctx; #H/#C carry
+  the filter config; status reports matched/context/filtered.
+- Board acceptance: OTA applied; prefixes #error,#warning
+  filtered 8 heartbeat lines in 15 s with 0 matches; prefixes
+  heartbeat matched 7 lines; Geek Config save path verified end
+  to end (page task set the board config). Context (ctx) lines
+  were not observed on board: the only serial source emits one
+  matching line every ~2 s. Board left with filter enabled,
+  prefixes #error,#warning, post 1000 ms, pre 0.
