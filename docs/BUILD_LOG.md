@@ -885,3 +885,14 @@ status, Muse Link text + image, OTA, reboot.
   external-page round trip returns to the avatar; explicit
   reboot keeps avatar mode and re-fetches the image. Board
   left in avatar mode.
+
+## Run #42 — TF serial logger (2026-11-27)
+- Build run 45973475865, version 1.0.2-beta.36ec942 (feat/tflog,
+  merged to main 36ec942). Publish job transient failure; full
+  rerun succeeded.
+- Prototype gates: G1 app +65,536 B; G2 mount/write/CRC and
+  pull-reinsert recovery PASS; G3 heartbeat zero-drop PASS.
+- Board acceptance: OTA applied; device.features tflog=true
+  reboot; log.status running/mounted; segment 00000001.LOG with
+  #H/#A anchor and receipt-stamped #L heartbeat lines; log.search
+  returns matching line. Board left with tflog ON.
