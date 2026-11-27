@@ -930,3 +930,14 @@ status, Muse Link text + image, OTA, reboot.
   were not observed on board: the only serial source emits one
   matching line every ~2 s. Board left with filter enabled,
   prefixes #error,#warning, post 1000 ms, pre 0.
+
+## Run #45 — TF log records outgoing serial (2026-11-27)
+- Build 46006125512, version 1.0.2-beta.f56ef6a, merged to main
+  f56ef6a.
+- serial.write bytes are tee'd into the logger and recorded as
+  "#L <mono> tx <text>" (txp for idle-flushed partials), always
+  recorded regardless of the RX filter; status reports
+  tx_records.
+- Board acceptance: OTA applied; serial.write "TXTEST hello"
+  produced "#L 47583 tx TXTEST hello" in segment 6 with the
+  #error/#warning RX filter enabled.
