@@ -896,3 +896,20 @@ status, Muse Link text + image, OTA, reboot.
   reboot; log.status running/mounted; segment 00000001.LOG with
   #H/#A anchor and receipt-stamped #L heartbeat lines; log.search
   returns matching line. Board left with tflog ON.
+
+## Run #43 — TF log timestamped names + delete (2026-11-27)
+- Builds 45978657189 (1.0.2-beta.2db2042) and 45991964332
+  (1.0.2-beta.cc6270b), merged to main cc6270b.
+- Segment filenames carry the segment start wall time
+  (YYYYMMDD-HHMMSS-<seq>.LOG, local time); before time sync a
+  segment is UNSYNCED-<boot>-<seq>-<mono_ms>.LOG and archives to
+  the timestamped name when sync lands. seq stays the stable ID;
+  log.list/read return filename. New log.delete refuses the
+  segment being written.
+- Board acceptance: OTA applied; new segments timestamped
+  (20261127-180636-00000003.LOG, 20261127-194131-00000004.LOG);
+  legacy segment readable; log.delete on the active segment
+  refused ("segment is being written"), on a closed segment
+  deleted and the list updated. The unsynced-to-archive
+  transition itself was not observed on board (RTC kept time
+  across OTA reboots); cold-boot check still pending.
