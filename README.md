@@ -2,7 +2,7 @@
 
 用 GitHub Actions 编译 [legogogo25e/esp32-muse-geek](https://github.com/legogogo25e/esp32-muse-geek) 的 ESP32 固件，不用在本地装 ESP-IDF。
 
-源码仓是 Geek 专用（Waveshare ESP32-S3-GEEK 一块板，带状态屏和 `device.display` 命令）；本仓只负责编译、发布固件和网页烧录。
+源码仓是 Geek 专用（Waveshare ESP32-S3-GEEK 一块板，带状态屏、`device.display`、串口/I2C/GPIO 外接接口、STM32 SWD 烧录和 TF 卡串口 logger）；本仓只负责编译、发布固件和网页烧录。
 
 - 工具链：`espressif/idf:v6.0.3`（上游要求 ESP-IDF v6.0.3，其他版本不支持）
 - 源码默认编 `main` 分支，可在 Run workflow 时改 `upstream_ref` 钉到某个 commit
